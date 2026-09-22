@@ -91,6 +91,27 @@ opnieuw installeren. Vanaf fase 5 heeft TradeJournal ingebouwde backup/restore
 naar de Bestanden-app, zodat je lokale data niet verloren gaat bij een
 her-installatie.
 
+### 4. Backup, restore en CSV-import
+
+Alles staat onder **Meer → Data**:
+
+- **Backup & herstel → Backup maken** maakt een `.zip` (`backup.json` + alle
+  screenshots) en opent de share sheet. Kies *Bewaar in Bestanden* (bijv. iCloud
+  Drive) of AirDrop hem naar je computer. Het dashboard toont een waarschuwing
+  zodra je laatste backup ouder is dan 7 dagen.
+- **Automatische backup**: kies een map in Bestanden en stel *dagelijks* of *bij
+  elke app-start* in. De laatste 10 automatische backups blijven bewaard.
+- **Herstel uit backup…** leest een backup-zip in, toont een samenvatting en
+  vervangt na bevestiging alle data in de app. Doe dit direct na een
+  her-installatie.
+- **CSV importeren** herkent automatisch exports van Tradovate (Performance en
+  Orders), NinjaTrader (Trades en Executions), TopstepX/ProjectX, MetaTrader 4/5
+  en TradingView. Andere bestanden koppel je zelf per kolom. Losse fills worden
+  samengevoegd tot trades en trades die al in je journal staan worden als
+  duplicaat overgeslagen.
+- **Trades exporteren als CSV** levert één rij per trade op; dit bestand kan
+  ook weer geïmporteerd worden.
+
 ## Repostructuur
 
 ```

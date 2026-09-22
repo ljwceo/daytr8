@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Dashboard-tab: filters, KPI-kaarten, trading score radar, equity curve,
-/// dagelijkse P&L, drawdown, mini-kalender en recente trades.
+/// Dashboard-tab: backup-waarschuwing, filters, KPI-kaarten, trading score
+/// radar, equity curve, dagelijkse P&L, drawdown, mini-kalender en recente trades.
 struct DashboardView: View {
 
     @Query(sort: \Trade.entryDate, order: .reverse) private var trades: [Trade]
@@ -32,6 +32,8 @@ struct DashboardView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
+                            BackupReminderBannerView()
+
                             DashboardFilterBar(
                                 viewModel: viewModel,
                                 accounts: accounts,

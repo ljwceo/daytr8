@@ -1,15 +1,15 @@
 import SwiftUI
 import SwiftData
 
-/// Voorlopige "Meer"-tab.
+/// "Meer"-tab.
 ///
-/// In fase 1 dient dit scherm vooral als ingang voor de debug-tools:
-/// - Standaard-data seeden (confluences + instrumentpresets)
-/// - ~2 jaar aan voorbeelddata genereren
-/// - Alle data wissen
+/// - Data: backup & herstel (incl. automatische backup en CSV-export) en
+///   CSV-import (fase 5).
+/// - Debug-tools uit fase 1: standaarddata seeden, ~2 jaar voorbeelddata
+///   genereren en alle data wissen.
 ///
-/// In een latere fase wordt dit uitgebouwd tot een volwaardig instellingenmenu
-/// met accounts, playbooks, backup, thema-opties etc.
+/// Accounts, playbooks, confluence-beheer en overige instellingen volgen in
+/// latere fases.
 struct MoreView: View {
 
     @Environment(\.modelContext) private var modelContext
@@ -19,7 +19,10 @@ struct MoreView: View {
     @Query private var confluences: [Confluence]
     @Query private var instruments: [Instrument]
 
+    @AppStorage(BackupSettings.Keys.lastBackupDate) private var lastBackupInterval: Double = 0
+
     @State private var isBusy = false
+    @State private var showingCSVImport = false
     @State private var confirmWipe = false
     @State private var lastMessage: String? = nil
 
@@ -34,6 +37,27 @@ struct MoreView: View {
                         row("Trades", value: "\(trades.count)")
                         row("Confluences", value: "\(confluences.count)")
                         row("Instrumenten", value: "\(instruments.count)")
+                    }
+
+                    Section("Data") {
+                        NavigationLink {
+                            BackupView()
+                        } label: {
+                            HStack {
+                                Label("Backup & herstel", systemImage: "externaldrive")
+                                Spacer()
+                                if isBackupStale {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(Theme.warning)
+                                }
+                            }
+                        }
+
+                        Button {
+                            showingCSVImport = true
+                        } label: {
+                            Label("CSV importeren", systemImage: "square.and.arrow.down.on.square")
+                        }
                     }
 
                     Section("Debug (fase 1)") {
@@ -77,6 +101,9 @@ struct MoreView: View {
             .navigationTitle("Meer")
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .sheet(isPresented: $showingCSVImport) {
+                CSVImportView()
+            }
             .confirmationDialog(
                 "Weet je zeker dat je alle data wilt wissen?",
                 isPresented: $confirmWipe,
@@ -93,6 +120,10 @@ struct MoreView: View {
                 Text("Deze actie kan niet ongedaan gemaakt worden.")
             }
         }
+    }
+
+    private var isBackupStale: Bool {
+        BackupSettings.isStale(lastBackup: lastBackupInterval > 0 ? Date(timeIntervalSince1970: lastBackupInterval) : nil)
     }
 
     private func row(_ title: String, value: String) -> some View {
