@@ -35,6 +35,7 @@ public final class TradeFormViewModel {
         mode: Mode,
         lastTrade: Trade? = nil,
         fallbackAccount: Account? = nil,
+        initialDate: Date? = nil,
         editingService: TradeEditingService = TradeEditingService(),
         statsService: StatsService = StatsService()
     ) {
@@ -44,9 +45,25 @@ public final class TradeFormViewModel {
         switch mode {
         case .create:
             self.values = .makeDefault(basedOn: lastTrade, fallbackAccount: fallbackAccount)
+            if let initialDate {
+                values.entryDate = Self.combine(day: initialDate, timeOfDay: values.entryDate)
+            }
         case .edit(let trade):
             self.values = editingService.values(from: trade)
         }
+    }
+
+    /// Combineert de kalenderdag van `day` met het uur/minuut van `timeOfDay`,
+    /// zodat "snel een trade toevoegen" vanuit de dagdetail start op de
+    /// gekozen dag in plaats van vandaag.
+    private static func combine(day: Date, timeOfDay: Date) -> Date {
+        let calendar = Calendar.current
+        var merged = calendar.dateComponents([.year, .month, .day], from: day)
+        let time = calendar.dateComponents([.hour, .minute, .second], from: timeOfDay)
+        merged.hour = time.hour
+        merged.minute = time.minute
+        merged.second = time.second
+        return calendar.date(from: merged) ?? day
     }
 
     public var title: String { mode.isEditing ? "Trade bewerken" : "Nieuwe trade" }
