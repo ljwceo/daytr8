@@ -25,6 +25,22 @@ struct TradeDetailView: View {
     private var currency: String { trade.account?.currency ?? "USD" }
 
     var body: some View {
+        // Een trade die intussen gewist is (bijv. via "Alles wissen" of een
+        // restore terwijl dit scherm in een andere tab openstond) mag niet
+        // meer uitgelezen worden — dat crasht SwiftData.
+        if trade.isDeleted || trade.modelContext == nil {
+            ContentUnavailableView(
+                "Trade verwijderd",
+                systemImage: "trash",
+                description: Text("Deze trade bestaat niet meer.")
+            )
+            .background(Theme.background)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             ScrollView {

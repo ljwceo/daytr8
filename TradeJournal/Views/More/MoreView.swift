@@ -97,6 +97,13 @@ struct MoreView: View {
                 }
                 .scrollContentBackground(.hidden)
                 .background(Theme.background)
+
+                if isBusy {
+                    ProgressView("Bezig…")
+                        .padding(Theme.cardPadding)
+                        .background(Theme.elevated)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                }
             }
             .navigationTitle("Meer")
             .toolbarBackground(Theme.background, for: .navigationBar)
