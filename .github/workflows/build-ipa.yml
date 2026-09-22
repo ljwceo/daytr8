@@ -1,0 +1,79 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build TradeJournal.ipa
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode & Swift versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned, Release, iphoneos)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TradeJournal.xcodeproj \
+            -scheme TradeJournal \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package .app into unsigned .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find build/Build/Products/Release-iphoneos -maxdepth 2 -name 'TradeJournal.app' -print -quit)"
+          if [ -z "${APP_PATH}" ]; then
+            echo "TradeJournal.app not found under build/Build/Products/Release-iphoneos" >&2
+            find build/Build/Products -maxdepth 3 -print >&2 || true
+            exit 1
+          fi
+          echo "Found app at: ${APP_PATH}"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "${APP_PATH}" Payload/
+          zip -qry TradeJournal.ipa Payload
+          ls -lh TradeJournal.ipa
+
+      - name: Upload IPA as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeJournal-unsigned-ipa
+          path: TradeJournal.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach IPA to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TradeJournal.ipa
+          fail_on_unmatched_files: true
+          generate_release_notes: true
