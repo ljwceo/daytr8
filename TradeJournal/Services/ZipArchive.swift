@@ -98,10 +98,16 @@ public enum ZipArchive {
 
     static func dosDateTime(_ date: Date) -> (time: UInt16, date: UInt16) {
         let components = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        let year = min(max((components.year ?? 1980) - 1980, 0), 127)
-        let time = UInt16(((components.hour ?? 0) << 11) | ((components.minute ?? 0) << 5) | ((components.second ?? 0) / 2))
-        let day = UInt16((year << 9) | ((components.month ?? 1) << 5) | (components.day ?? 1))
-        return (time, day)
+        let year: Int = min(max((components.year ?? 1980) - 1980, 0), 127)
+        let month: Int = components.month ?? 1
+        let dayOfMonth: Int = components.day ?? 1
+        let hour: Int = components.hour ?? 0
+        let minute: Int = components.minute ?? 0
+        let second: Int = components.second ?? 0
+
+        let timeBits: Int = (hour << 11) | (minute << 5) | (second / 2)
+        let dateBits: Int = (year << 9) | (month << 5) | dayOfMonth
+        return (UInt16(timeBits), UInt16(dateBits))
     }
 }
 
