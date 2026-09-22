@@ -255,14 +255,117 @@ Nieuwe tests (`TradeJournalTests/`)
 - [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
       GitHub Actions-build; niet in deze sessie uitgevoerd).
 
-## Volgende fase — Fase 3: Kalender & dashboard
+## Fase 3 — Kalender & dashboard ✅
 
-Vooruitkijkend op basis van `SPEC.md §5` en `§6`:
+Doel: `SPEC.md §5` (kalender) en `§6` (dashboard) werkend krijgen bovenop het
+datamodel en de statistiek-services uit fase 1 en het trade-log/formulier uit
+fase 2. Geen wijzigingen aan Rapporten (§7) — dat is fase 4.
 
-- Kalender: maandweergave met netto P&L/aantal trades/win rate per dag,
-  weektotalen, jaaroverzicht (heatmap), dagdetail met intraday-P&L-grafiek
-  en snel een trade toevoegen.
-- Dashboard: filters (account/periode/symbool/playbook/confluence), kaarten
-  met de kernstatistieken, trading score (radar-chart), Swift Charts
-  (equity curve, dagelijkse P&L, drawdown), mini-kalender en recente trades.
-- Cache/aggregatie per dag zodat dit soepel blijft met jaren aan data.
+### Aangemaakte / gewijzigde bestanden
+
+Nieuwe services (`TradeJournal/Services/`)
+- `CalendarAggregationService.swift` — groepeert trades in één O(n)-pas naar
+  `DayAggregate` (netto/bruto P&L, aantal trades, win/loss/breakeven/open,
+  win rate) per dag en rolt die op naar `MonthAggregate` per maand. Dagcellen
+  doen daarna alleen nog een O(1) dictionary-lookup in plaats van de volledige
+  tradelijst te filteren — dat is de "cache per dag" uit de spec, zonder een
+  aparte tussen-renders bewaarde cache-laag die dit stadium van de app nog
+  niet nodig heeft.
+- `TradingScoreService.swift` — samengestelde trading score (zoals de Zella
+  Score): 6 assen van 0-100 (win rate, profit factor, avg win/loss,
+  consistentie, drawdown, regels-gevolgd) plus een gemiddelde. Alle formules
+  zijn expliciet gedocumenteerde heuristieken (geen officiële formule
+  gepubliceerd).
+- `StatsService.swift` — `drawdownCurve(for:startingBalance:)` toegevoegd:
+  cumulatieve drawdown (piek − equity) op basis van de bestaande
+  `equityCurve`, voor de drawdown-grafiek op het dashboard.
+
+Nieuwe viewmodels (`TradeJournal/ViewModels/`)
+- `CalendarViewModel.swift` — UI-state (getoonde maand/jaar, geselecteerde
+  dag, jaaroverzicht aan/uit) plus zuivere rasterlogica (`weeks`,
+  `weekTotal`, navigatie). Houdt zelf geen trades vast.
+- `DashboardViewModel.swift` — filters (accounts, periode, symbool,
+  playbook, confluence) en pure afleidingen: gefilterde trades, statistieken,
+  `equityPoints`/`drawdownPoints`/`dailyPnLPoints` (`DateValuePoint`),
+  trading score, rule-adherence-rate, recente trades.
+- `DayDetailViewModel.swift` — trades van één dag (op exit-dag, of entry-dag
+  als nog open), intraday cumulatieve P&L, en het aanmaken/bijwerken van het
+  `DailyJournal` van die dag (leeg concept wordt niet opgeslagen).
+- `TradeFormViewModel.swift` / `Views/Trades/TradeFormView.swift` —
+  `initialDate` parameter toegevoegd zodat "snel een trade toevoegen" vanuit
+  de dagdetail start op de gekozen kalenderdag i.p.v. vandaag.
+
+Nieuwe kalenderschermen (`TradeJournal/Views/Calendar/`)
+- `CalendarView.swift` — maandweergave met "vandaag"-knop, swipe + pijltjes
+  tussen maanden, toggle naar het jaaroverzicht, navigatie naar `DayDetailView`.
+- `CalendarMonthGridView.swift` — dagraster + weektotalen-kolom.
+- `CalendarDayCellView.swift` — dagvakje met netto P&L/aantal trades,
+  achtergrondintensiteit schaalt met de grootte van de P&L.
+- `YearHeatmapView.swift` — 12 mini-maanden (dag-heatmap + maandtotaal),
+  tikken springt naar die maand.
+- `DayDetailView.swift` — samenvatting, intraday-P&L-grafiek (bij >1 trade),
+  tradelijst van de dag, dagjournal-editor (pre-market plan, bias, nieuws,
+  review, mood, cijfer) en "+" voor een nieuwe trade op die dag.
+
+Nieuwe dashboardschermen (`TradeJournal/Views/Dashboard/`)
+- `DashboardView.swift` — filterbalk, KPI-kaartenraster, trading score,
+  equity curve, dagelijkse P&L, drawdown, mini-kalender, recente trades.
+- `DashboardFilterBar.swift` — periode/account(s)/symbool/playbook/confluence
+  als menu-chips.
+- `StatCardView.swift` (in `Views/Components/`) — herbruikbare KPI-kaart.
+- `TradingScoreRadarView.swift` — radar/spider-chart, zelf getekend met
+  `Canvas` (Swift Charts heeft geen radar-chart-type).
+- `EquityCurveChartView.swift` — lijn+vulling-grafiek, herbruikt voor zowel
+  de dashboard-equitycurve, de drawdown-grafiek als de intraday-grafiek in
+  `DayDetailView`.
+- `DailyPnLChartView.swift` — staafdiagram per dag, groen/rood.
+- `MiniCalendarView.swift` — compacte alleen-lezen maandkalender.
+- `RecentTradesCardView.swift` — laatste trades uit de huidige selectie.
+
+Utilities
+- `Utilities/Theme.swift` — `compactCurrency(_:)` toegevoegd voor compacte
+  $-notatie in kalendercellen en mini-kaarten.
+
+Nieuwe tests (`TradeJournalTests/`)
+- `CalendarAggregationServiceTests.swift` — groepering op exit-dag vs.
+  entry-dag (open trades), meerdere trades op één dag, maand-rollup.
+- `TradingScoreServiceTests.swift` — elke as afzonderlijk (win rate, profit
+  factor incl. ∞/nil, avg win/loss, drawdown, consistentie incl. randgevallen,
+  rule adherence) en het gemiddelde.
+- `CalendarViewModelTests.swift` — weekraster (maandag-start, volledige
+  maand), maand/jaar-navigatie, "vandaag", `selectMonth`, weektotalen.
+- `DashboardViewModelTests.swift` — elk filter afzonderlijk, grafiekpunten,
+  rule-adherence-rate, recente trades.
+- `DayDetailViewModelTests.swift` — dag-filtering, intraday cumulatieve P&L,
+  journal aanmaken/bijwerken/niet-opslaan-bij-leeg-concept.
+- `StatsServiceTests.swift` — test voor `drawdownCurve` toegevoegd.
+
+### Definition of done voor fase 3
+
+- [x] Kalender: maandweergave met netto P&L/aantal trades/win rate per dag,
+      weektotalen, jaaroverzicht (heatmap), snel navigeren (jaarkiezer, swipe,
+      "vandaag").
+- [x] Dagdetail: alle trades van die dag, intraday cumulatieve P&L-grafiek,
+      het daily journal van die dag, en snel een trade toevoegen.
+- [x] Dashboard: filters (account/periode/symbool/playbook/confluence),
+      KPI-kaarten, trading score (radar-chart), Swift Charts (equity curve,
+      dagelijkse P&L, drawdown), mini-kalender, recente trades.
+- [x] Aggregatie per dag in één O(n)-pas i.p.v. per-cel filteren, zodat dit
+      soepel blijft met jaren aan data.
+- [x] Unit tests voor de nieuwe services en viewmodels.
+- [x] `PROGRESS.md` bijgewerkt.
+- [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
+      GitHub Actions-build; niet in deze sessie uitgevoerd).
+
+## Volgende fase — Fase 4: Rapporten en analyse
+
+Vooruitkijkend op basis van `SPEC.md §7`:
+
+- Tabbladen met tabellen + grafieken, filterbaar: per confluence, per
+  combinatie van confluences (gerangschikt op expectancy), per playbook,
+  per symbool, per richting, per sessie, per dag van de week, per uur van de
+  dag, per trade-duur, per tag, per mistake.
+- Emotie vs. resultaat, rating vs. resultaat.
+- Vergelijkingsmodus: twee filtersets naast elkaar.
+- Herbruikt `StatsService`/`DashboardViewModel`-filters waar mogelijk; nieuwe
+  aggregatie-service voor "groeperen op X" hoort in `Services/`.

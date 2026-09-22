@@ -58,6 +58,17 @@ enum Theme {
         if value < 0 { return loss }
         return neutral
     }
+
+    /// Compacte $-notatie voor kalendercellen en kleine kaarten
+    /// (bijv. "$1.2k", "-$340") waar een volledig currency-format niet past.
+    static func compactCurrency(_ value: Double) -> String {
+        let sign = value < 0 ? "-" : ""
+        let magnitude = abs(value)
+        if magnitude >= 1000 {
+            return "\(sign)$\(String(format: "%.1fk", magnitude / 1000))"
+        }
+        return "\(sign)$\(String(format: "%.0f", magnitude))"
+    }
 }
 
 extension Color {

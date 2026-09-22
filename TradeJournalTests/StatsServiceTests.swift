@@ -254,6 +254,28 @@ final class StatsServiceTests: XCTestCase {
         XCTAssertEqual(curve[1].equity, 1_025, accuracy: 1e-6)
     }
 
+    func test_drawdownCurve_tracksPeakToTroughDips() {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let win = makeTrade(entry: 18_000, exit: 18_010, entryDate: base, exitDate: base.addingTimeInterval(60))
+        let loss = makeTrade(
+            entry: 18_010, exit: 17_990,
+            entryDate: base.addingTimeInterval(120),
+            exitDate: base.addingTimeInterval(180)
+        )
+        let recovery = makeTrade(
+            entry: 17_990, exit: 18_000,
+            entryDate: base.addingTimeInterval(240),
+            exitDate: base.addingTimeInterval(300)
+        )
+
+        // win: +200, loss: -400, recovery: +200 → equity 200, -200, 0; piek blijft 200.
+        let curve = stats.drawdownCurve(for: [win, loss, recovery])
+        XCTAssertEqual(curve.count, 3)
+        XCTAssertEqual(curve[0].drawdown, 0, accuracy: 1e-6)
+        XCTAssertEqual(curve[1].drawdown, 400, accuracy: 1e-6)
+        XCTAssertEqual(curve[2].drawdown, 200, accuracy: 1e-6)
+    }
+
     func test_recomputeSession_setsBasedOnEntryDate() {
         let ny = TimeZone(identifier: "America/New_York")!
         var cal = Calendar(identifier: .gregorian); cal.timeZone = ny

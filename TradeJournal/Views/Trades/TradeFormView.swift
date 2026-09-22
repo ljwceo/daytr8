@@ -22,8 +22,8 @@ struct TradeFormView: View {
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Mistake.name) private var mistakes: [Mistake]
 
-    init(mode: TradeFormViewModel.Mode, lastTrade: Trade? = nil, fallbackAccount: Account? = nil) {
-        _viewModel = State(initialValue: TradeFormViewModel(mode: mode, lastTrade: lastTrade, fallbackAccount: fallbackAccount))
+    init(mode: TradeFormViewModel.Mode, lastTrade: Trade? = nil, fallbackAccount: Account? = nil, initialDate: Date? = nil) {
+        _viewModel = State(initialValue: TradeFormViewModel(mode: mode, lastTrade: lastTrade, fallbackAccount: fallbackAccount, initialDate: initialDate))
     }
 
     /// Actieve confluences, plus reeds geselecteerde (ook als die inmiddels gearchiveerd is).

@@ -350,4 +350,14 @@ public struct StatsService: Sendable {
             return (entry.0, running)
         }
     }
+
+    /// Cumulatieve drawdown (piek min huidige equity, altijd ≥ 0) op basis van
+    /// `equityCurve`. Handig voor de drawdown-grafiek op het dashboard.
+    public func drawdownCurve(for trades: [Trade], startingBalance: Double = 0) -> [(date: Date, drawdown: Double)] {
+        var peak = startingBalance
+        return equityCurve(for: trades, startingBalance: startingBalance).map { point in
+            peak = max(peak, point.equity)
+            return (point.date, peak - point.equity)
+        }
+    }
 }
