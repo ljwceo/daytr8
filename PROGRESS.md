@@ -431,18 +431,146 @@ Nieuwe tests (`TradeJournalTests/`)
 - [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
       GitHub Actions-build; niet in deze sessie uitgevoerd).
 
-## Volgende fase — Fase 5: Import en export
+## Fase 5 — Import en export ✅
 
-Vooruitkijkend op basis van `SPEC.md §9`:
+Doel: `SPEC.md §9` — CSV-import met kolommapping en broker-presets (fills
+samenvoegen, duplicaten detecteren), volledige backup/restore als `.zip`,
+optionele automatische backup naar een map in Bestanden, CSV-export en een
+waarschuwing als de laatste backup ouder is dan 7 dagen. Geen externe
+dependencies: CSV-parser en zip-lezer/-schrijver zijn zelf geïmplementeerd.
 
-- CSV-import met kolommapping-scherm (zelf kolommen koppelen), presets voor
-  Tradovate, NinjaTrader, TopstepX/ProjectX, MetaTrader, TradingView. Losse
-  fills automatisch samenvoegen tot trades (`TradeExecution`). Duplicaten
-  detecteren.
-- Volledige backup-export naar `.zip` (JSON + screenshots) via de iOS share
-  sheet / Bestanden-app, en volledige restore vanuit zo'n backup. Versienummer
-  in de payload voor toekomstige migraties.
-- Optionele automatische backup naar een gekozen map in Bestanden
-  (security-scoped bookmark).
-- CSV-export van trades.
-- Waarschuwing in de app als de laatste backup ouder is dan 7 dagen.
+### Aangemaakte / gewijzigde bestanden
+
+Nieuwe modellen / waarde-types (`TradeJournal/Models/`)
+- `CSVColumnMapping.swift` — `CSVImportMode` (losse fills / complete trades),
+  `CSVImportField` (alle koppelbare velden, incl. koop-/verkoop-varianten voor
+  Tradovate) en `CSVColumnMapping` (veld → kolomindex, datumvolgorde,
+  tijdzone, `validationErrors`).
+- `ImportedTrade.swift` — `ImportedFill` en `ImportedTrade` (los van
+  SwiftData) plus de `fingerprint` voor duplicaatdetectie (symbool, richting,
+  entry-seconde, aantal, entry-prijs).
+- `BackupPayload.swift` — het `backup.json`-formaat met `formatVersion`
+  (nu 1) en DTO's voor alle entiteiten; relaties via `UUID`, afbeeldingen via
+  bestandsnaam in `images/`.
+
+Nieuwe services (`TradeJournal/Services/`)
+- `CSVParser.swift` — RFC 4180-parser (quotes, `""`, regeleinden in velden,
+  CRLF/CR/LF, BOM, auto-detectie van `,` `;` tab, UTF-8/UTF-16/Windows-1252) en
+  `CSVWriter`.
+- `ImportValueParser.swift` — getallen (`$1,234.50`, `$(25.00)`, `1.234,56`),
+  datums (jaar-eerst, VS/EU-volgorde met zelfcorrectie, 12/24-uurs, ISO 8601,
+  offsets, Unix-timestamps), koop/verkoop/long/short en symboolnormalisatie
+  (`MNQZ4`, `CME_MINI:NQ1!`, `NQ 12-24`, `/ES`, `EURUSD.a` → root-symbool).
+- `CSVImportPresets.swift` — presets voor Tradovate (Performance + Orders),
+  NinjaTrader (Trades + Executions), TopstepX/ProjectX, MetaTrader 4/5,
+  TradingView en de eigen CSV-export; auto-detectie op kolomnamen, `Naam#n`
+  voor dubbele kolomnamen (MetaTrader `Time`/`Price`).
+- `FillAggregator.swift` — voegt fills per symbool samen tot trades op basis
+  van de netto positie (bijschalen, partial exits, position flips met
+  naar-rato-verdeling van kosten, open posities).
+- `CSVImportService.swift` — `extract` (rijen → trades + probleemrijen,
+  geannuleerde orders overslaan), `preview` (duplicaten t.o.v. het journal én
+  binnen het bestand), `commit` (Trades + `TradeExecution`s, tick size/value
+  uit instrument of preset; voor onbekende symbolen afgeleid uit de
+  gerapporteerde P&L) en `tickSpec`.
+- `CSVExportService.swift` — één rij per trade met P&L, R, sessie,
+  confluences/tags/fouten en notities; herimporteerbaar via de
+  TradeJournal-preset.
+- `ZipArchive.swift` — `ZipWriter` (streaming naar schijf, deflate via het
+  `Compression`-framework, stored voor afbeeldingen) en `ZipReader`
+  (memory-mapped, stored + deflate, CRC-controle, geen ZIP64).
+- `BackupService.swift` — export naar zip, `loadBackup` (valideert zonder iets
+  te wijzigen, weigert nieuwere formaatversies) en `restore` (wist alles en
+  laadt de backup in, ontbrekende afbeeldingen worden overgeslagen).
+- `BackupSettings.swift` — laatste (auto)backup, frequentie
+  (uit/bij elke start/dagelijks), map-bookmark, bewaaraantal, en de pure
+  beslisregels `isStale` (>7 dagen) en `isAutoBackupDue`.
+- `AutoBackupService.swift` — map kiezen (bookmark van de security-scoped
+  URL uit de document picker, geen entitlement nodig), backup schrijven via
+  `NSFileCoordinator`, oude automatische backups opruimen (standaard laatste 10).
+
+Nieuwe viewmodels (`TradeJournal/ViewModels/`)
+- `CSVImportViewModel.swift` — bestand → preset/mapping → voorbeeld → import.
+- `BackupViewModel.swift` — backup maken/delen, restore met bevestiging,
+  automatische backup, CSV-export.
+
+Nieuwe/gewijzigde views
+- `Views/More/BackupView.swift` — status, backup maken (share sheet),
+  herstellen (met samenvatting + bevestiging), automatische backup en
+  CSV-export. Eén `fileImporter` voor zowel zip als map.
+- `Views/More/CSVImportView.swift` — bestand kiezen, preset/modus/
+  datumnotatie/tijdzone/account, kolommapping met voorbeeldwaarde per veld,
+  voorbeeldlijst met nieuw/duplicaat/fout en "duplicaten toch importeren".
+- `Views/More/MoreView.swift` — nieuwe sectie "Data" (Backup & herstel met
+  waarschuwingsicoon, CSV importeren).
+- `Views/Components/ActivityShareSheet.swift` — `UIActivityViewController`-brug;
+  alleen een voltooide deel-actie telt als backup.
+- `Views/Components/BackupReminderBannerView.swift` — waarschuwing bij een
+  backup ouder dan 7 dagen (via `@AppStorage`), tikken opent `BackupView`.
+- `Views/Dashboard/DashboardView.swift` — toont de backup-banner bovenaan.
+- `App/TradeJournalApp.swift` — draait `AutoBackupService.runIfDue` bij
+  app-start en bij terugkeer naar de voorgrond.
+
+Docs
+- `README.md` — sectie "Backup, restore en CSV-import".
+
+Nieuwe tests (`TradeJournalTests/`)
+- `CSVParserTests.swift` — quotes/escapes/regeleinden, scheidingsteken-
+  detectie, BOM, lege regels, rijbreedte, Windows-1252, writer-roundtrip.
+- `ImportValueParserTests.swift` — getalnotaties, datumformaten/offsets/
+  tijdzones/timestamps, kant/richting, symboolnormalisatie.
+- `FillAggregatorTests.swift` — round trip, bijschalen + partial exits,
+  position flip met kostenverdeling, meerdere symbolen, open positie.
+- `CSVImportServiceTests.swift` — een tekstfixture per preset (Tradovate ×2,
+  NinjaTrader ×2, TopstepX, MetaTrader, TradingView) met auto-detectie,
+  validatie, `Naam#n`, eigen mapping, probleemrijen, duplicaten, commit met
+  executions en P&L-controle, `tickSpec`.
+- `CSVExportServiceTests.swift` — kolommen en berekende velden, open trades,
+  getalnotatie, export → import-roundtrip + duplicaat.
+- `ZipArchiveTests.swift` — CRC-32-testvector, stored/deflate/leeg/UTF-8-namen,
+  geen zip, corruptie (CRC).
+- `BackupServiceTests.swift` — inhoud van de zip, samenvatting, volledige
+  roundtrip (alle relaties, screenshots, P&L identiek, bestaande data
+  vervangen), nieuwere formaatversie/ontbrekende payload geweigerd,
+  ontbrekende afbeeldingen overgeslagen.
+- `BackupSettingsTests.swift` — 7-dagen-grens, persistentie, defaults,
+  `isAutoBackupDue`, opruimen van alleen automatische backups.
+
+### Definition of done voor fase 5
+
+- [x] CSV-import met kolommapping-scherm en presets voor Tradovate,
+      NinjaTrader, TopstepX/ProjectX, MetaTrader en TradingView.
+- [x] Losse fills automatisch samengevoegd tot trades; duplicaten gedetecteerd.
+- [x] Volledige backup naar `.zip` (JSON + screenshots) via share sheet /
+      Bestanden, en volledige restore met versienummer in de payload.
+- [x] Optionele automatische backup naar een gekozen map (bookmark),
+      bij elke app-start of dagelijks.
+- [x] CSV-export van trades.
+- [x] Waarschuwing als de laatste backup ouder is dan 7 dagen.
+- [x] Unit tests voor CSV-parser, import, fill-aggregatie, export, zip en backup.
+- [x] `PROGRESS.md` en `README.md` bijgewerkt.
+- [x] Groene CI-run (unsigned IPA-build, workflow_dispatch op deze branch).
+- [ ] Unit tests lokaal draaien (`xcodebuild test`) — de CI bouwt alleen de
+      app en in deze sessie was geen Swift-toolchain beschikbaar.
+
+### Openstaande punten
+
+- Backup/restore draait synchroon op de main actor; bij heel grote journals
+  (duizenden screenshots) kan de UI even vastlopen. Eventueel later naar een
+  achtergrond-`ModelContext` verplaatsen.
+- Presets zijn gebaseerd op de standaard-exportkolommen van de platforms;
+  wijkt een export af, dan kan de koppeling in het mappingscherm aangepast
+  worden. Eigen mappings worden (nog) niet onthouden.
+- De automatische backup draait alleen als de app geopend wordt (geen
+  Background Modes, conform `CLAUDE.md`).
+
+## Volgende fase — Fase 6: Extra TradeZella-achtige functies
+
+Vooruitkijkend op basis van `SPEC.md §10` (en §12 OCR, zie SPEC):
+
+- Daily journal-templates (pre-market / post-market) bewerkbaar.
+- Progress tracker met dagelijkse regels, streak- en consistentie-kalender.
+- Doelen: maandelijks P&L-doel, max daily loss, max drawdown voor prop firm
+  accounts met voortgangsbalk en waarschuwing.
+- Notebook, lokale herinneringen (`UNUserNotificationCenter`) en optioneel
+  Face ID / code-slot (`LocalAuthentication`).
