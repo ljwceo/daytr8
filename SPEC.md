@@ -142,3 +142,35 @@ laatste backup ouder is dan 7 dagen.
   (NSPhotoLibraryUsageDescription, NSCameraUsageDescription, NSFaceIDUsageDescription).
 
 Lever de volledige repository-inhoud op, bestand voor bestand, inclusief README.
+
+## 12. Screenshot import (OCR)
+Bij "Trade toevoegen" moet er een knop "Vul in vanuit screenshot" zijn waarmee ik een
+screenshot van mijn broker/platform kan kiezen (uit Foto's of camera) en de app zoveel
+mogelijk velden automatisch invult. Volledig on-device, offline, geen cloud.
+
+- Techniek: Apple Vision framework (`VNRecognizeTextRequest`) voor OCR. Geen externe
+  dependencies, geen netwerkverkeer.
+- Parser-service (`ScreenshotParser`) die eerst probeert een broker-template te matchen op
+  basis van herkende sleutelwoorden in de OCR-output (bijv. "TopstepX", "Tradovate",
+  "NinjaTrader", "MetaTrader", "TradingView"). Per broker een set regex-patronen voor
+  velden. Fallback op generieke heuristieken.
+- Uit te lezen velden (waar aanwezig): symbool/instrument, richting (long/short), entry
+  prijs, exit prijs, stop loss, take profit, quantity/lots/contracten, bruto en/of netto
+  P&L, entry- en exit-tijd, commissie/fees.
+- Symbool matcht tegen de bestaande `Symbol`-tabel; als er een preset is (NQ, MNQ, ES,
+  MES, YM, GC, CL, forex-paren) worden tick size/value automatisch gebruikt om ontbrekende
+  P&L of R uit te rekenen.
+- Broker-templates zijn geen hardcoded Swift-code maar JSON-resources
+  (`Resources/ScreenshotTemplates/*.json`) met per broker: identificerende sleutelwoorden
+  en een regex per veld. Nieuwe templates zijn toe te voegen zonder code aan te passen;
+  de instellingen tonen ook een lijst met beschikbare templates en laten mij eigen
+  templates aanmaken/bewerken.
+- Elk automatisch ingevuld veld toont in het formulier een klein icoontje "uit OCR", zodat
+  ik in één oogopslag zie welke velden ik nog moet controleren. Bij meerdere kandidaten
+  voor één veld toont het formulier een chip-rij met alternatieven waar ik uit kies.
+- De gebruikte screenshot wordt automatisch als bijlage aan de trade gekoppeld (dus geen
+  dubbele upload).
+- Foutafhandeling: als OCR faalt of niets bruikbaars vindt, opent het lege trade-formulier
+  met alleen de screenshot al bijgevoegd en een nette melding.
+- Unit tests: parser-tests met een paar voorbeeld-OCR-outputs (als tekstfixtures) per
+  broker-template, zodat de regexen niet stilletjes stukgaan.
