@@ -9,10 +9,18 @@ struct CalendarView: View {
 
     @State private var viewModel = CalendarViewModel()
 
+    /// Backtest-modus: standaard staan backtest-trades niet in de kalender.
+    /// Gedeeld met `DayDetailView` zodat dagcel en dagdetail overeenkomen.
+    @AppStorage(CalendarViewModel.includeBacktestKey) private var includeBacktest = false
+
     private let aggregationService = CalendarAggregationService()
 
+    private var visibleTrades: [Trade] {
+        CalendarViewModel.visibleTrades(trades, includeBacktest: includeBacktest)
+    }
+
     private var dayAggregates: [Date: DayAggregate] {
-        aggregationService.dayAggregates(for: trades, calendar: viewModel.calendar)
+        aggregationService.dayAggregates(for: visibleTrades, calendar: viewModel.calendar)
     }
 
     private var monthAggregates: [Date: MonthAggregate] {
@@ -75,6 +83,13 @@ struct CalendarView: View {
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Toggle("Backtest-trades tonen", isOn: $includeBacktest)
+                    } label: {
+                        Image(systemName: includeBacktest ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Vandaag") {
                         viewModel.goToToday()

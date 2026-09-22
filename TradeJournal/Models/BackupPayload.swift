@@ -11,7 +11,12 @@ import Foundation
 public struct BackupPayload: Codable, Equatable {
 
     /// Huidige versie van het backup-formaat.
-    public static let currentFormatVersion = 1
+    ///
+    /// - 1: fase 5 (accounts t/m daily journals).
+    /// - 2: fase 6 — journal-templates, dagelijkse regels (+ afvinkstatus) en
+    ///   notebook-notities. Deze velden zijn optioneel, zodat een versie
+    ///   1-backup gewoon blijft inlezen.
+    public static let currentFormatVersion = 2
 
     public var formatVersion: Int
     public var exportedAt: Date
@@ -25,6 +30,11 @@ public struct BackupPayload: Codable, Equatable {
     public var playbooks: [PlaybookDTO]
     public var trades: [TradeDTO]
     public var dailyJournals: [DailyJournalDTO]
+
+    // Sinds formaatversie 2 (ontbreken in versie 1 → `nil`).
+    public var journalTemplates: [JournalTemplateDTO]? = nil
+    public var dailyRules: [DailyRuleDTO]? = nil
+    public var notebookNotes: [NotebookNoteDTO]? = nil
 
     // MARK: - DTO's
 
@@ -178,5 +188,45 @@ public struct BackupPayload: Codable, Equatable {
         public var createdAt: Date
         public var updatedAt: Date
         public var screenshots: [ScreenshotDTO]
+    }
+
+    public struct JournalTemplateDTO: Codable, Equatable {
+        public var id: UUID
+        public var kind: String
+        public var name: String
+        public var body: String
+        public var isDefault: Bool
+        public var isBuiltIn: Bool
+        public var sortOrder: Int
+        public var createdAt: Date
+        public var updatedAt: Date
+    }
+
+    public struct DailyRuleCheckDTO: Codable, Equatable {
+        public var id: UUID
+        public var date: Date
+        public var isFollowed: Bool
+    }
+
+    public struct DailyRuleDTO: Codable, Equatable {
+        public var id: UUID
+        public var name: String
+        public var kind: String
+        public var threshold: Double
+        public var isActive: Bool
+        public var sortOrder: Int
+        public var createdAt: Date
+        public var checks: [DailyRuleCheckDTO]
+    }
+
+    public struct NotebookNoteDTO: Codable, Equatable {
+        public var id: UUID
+        public var title: String
+        public var body: String
+        public var isPinned: Bool
+        public var linkedDate: Date?
+        public var createdAt: Date
+        public var updatedAt: Date
+        public var tradeIDs: [UUID]
     }
 }

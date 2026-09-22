@@ -3,13 +3,14 @@ import SwiftData
 
 /// "Meer"-tab.
 ///
+/// - Journal (fase 6): progress tracker, notebook en journal-templates.
+/// - Accounts & doelen (fase 6): accounts met maanddoel, daily loss limit en
+///   max drawdown; backtest-accounts.
+/// - Instellingen (fase 6): journal-herinnering en app-slot.
 /// - Data: backup & herstel (incl. automatische backup en CSV-export) en
 ///   CSV-import (fase 5).
 /// - Debug-tools uit fase 1: standaarddata seeden, ~2 jaar voorbeelddata
 ///   genereren en alle data wissen.
-///
-/// Accounts, playbooks, confluence-beheer en overige instellingen volgen in
-/// latere fases.
 struct MoreView: View {
 
     @Environment(\.modelContext) private var modelContext
@@ -18,6 +19,8 @@ struct MoreView: View {
     @Query private var trades: [Trade]
     @Query private var confluences: [Confluence]
     @Query private var instruments: [Instrument]
+
+    @Environment(AppLockViewModel.self) private var appLock
 
     @AppStorage(BackupSettings.Keys.lastBackupDate) private var lastBackupInterval: Double = 0
 
@@ -37,6 +40,45 @@ struct MoreView: View {
                         row("Trades", value: "\(trades.count)")
                         row("Confluences", value: "\(confluences.count)")
                         row("Instrumenten", value: "\(instruments.count)")
+                    }
+
+                    Section("Journal") {
+                        NavigationLink {
+                            ProgressTrackerView()
+                        } label: {
+                            Label("Progress tracker", systemImage: "flame")
+                        }
+                        NavigationLink {
+                            NotebookView()
+                        } label: {
+                            Label("Notebook", systemImage: "note.text")
+                        }
+                        NavigationLink {
+                            JournalTemplatesView()
+                        } label: {
+                            Label("Journal-templates", systemImage: "doc.text")
+                        }
+                    }
+
+                    Section("Accounts") {
+                        NavigationLink {
+                            AccountsView()
+                        } label: {
+                            Label("Accounts & doelen", systemImage: "person.crop.circle")
+                        }
+                    }
+
+                    Section("Instellingen") {
+                        NavigationLink {
+                            ReminderSettingsView()
+                        } label: {
+                            Label("Herinneringen", systemImage: "bell")
+                        }
+                        NavigationLink {
+                            AppLockSettingsView(viewModel: appLock)
+                        } label: {
+                            Label("App-slot", systemImage: "lock")
+                        }
                     }
 
                     Section("Data") {
@@ -155,6 +197,7 @@ struct MoreView: View {
 
 #Preview {
     MoreView()
+        .environment(AppLockViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }

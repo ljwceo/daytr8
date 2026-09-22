@@ -46,18 +46,26 @@ public final class DashboardViewModel {
     public var playbookID: UUID?
     public var confluenceID: UUID?
 
+    /// Backtest-modus (SPEC §10): standaard tellen backtest-trades niet mee in
+    /// de statistieken. Een expliciet geselecteerd account telt altijd mee,
+    /// zodat een backtest-account los te analyseren is.
+    public var includeBacktest: Bool = false
+
     public let statsService: StatsService
     public let aggregationService: CalendarAggregationService
     public let scoreService: TradingScoreService
+    public let goalsService: GoalsService
 
     public init(
         statsService: StatsService = StatsService(),
         aggregationService: CalendarAggregationService = CalendarAggregationService(),
-        scoreService: TradingScoreService = TradingScoreService()
+        scoreService: TradingScoreService = TradingScoreService(),
+        goalsService: GoalsService = GoalsService()
     ) {
         self.statsService = statsService
         self.aggregationService = aggregationService
         self.scoreService = scoreService
+        self.goalsService = goalsService
     }
 
     // MARK: - Accountfilter
@@ -103,6 +111,11 @@ public final class DashboardViewModel {
     public func filteredTrades(_ trades: [Trade], now: Date = Date(), calendar: Calendar = .current) -> [Trade] {
         var result = trades
 
+        if !includeBacktest {
+            result = result.filter { trade in
+                trade.countsInLiveStats || (trade.account.map { selectedAccountIDs.contains($0.id) } ?? false)
+            }
+        }
         if !selectedAccountIDs.isEmpty {
             result = result.filter { trade in trade.account.map { selectedAccountIDs.contains($0.id) } ?? false }
         }
@@ -160,6 +173,14 @@ public final class DashboardViewModel {
         let stats = statistics(for: trades)
         let dailyPnL = dailyPnLPoints(for: trades, calendar: calendar).map(\.value)
         return scoreService.score(for: stats, dailyNetPnL: dailyPnL, ruleAdherenceRate: ruleAdherenceRate(for: trades))
+    }
+
+    // MARK: - Doelen
+
+    /// Doelen en limieten per account, los van de dashboardfilters (een
+    /// daily loss limit geldt altijd voor vandaag, ongeacht de gekozen periode).
+    public func goalStatuses(accounts: [Account], trades: [Trade], now: Date = Date(), calendar: Calendar = .current) -> [AccountGoalStatus] {
+        goalsService.statuses(accounts: accounts, trades: trades, now: now, calendar: calendar)
     }
 
     public func recentTrades(from trades: [Trade], limit: Int = 5) -> [Trade] {

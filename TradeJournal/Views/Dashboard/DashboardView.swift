@@ -34,6 +34,9 @@ struct DashboardView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             BackupReminderBannerView()
 
+                            let goals = viewModel.goalStatuses(accounts: accounts, trades: trades)
+                            GoalWarningBannerView(statuses: goals)
+
                             DashboardFilterBar(
                                 viewModel: viewModel,
                                 accounts: accounts,
@@ -43,6 +46,10 @@ struct DashboardView: View {
                             )
 
                             statCardsGrid
+
+                            if !goals.isEmpty {
+                                GoalsCardView(statuses: goals)
+                            }
 
                             scoreCard
 

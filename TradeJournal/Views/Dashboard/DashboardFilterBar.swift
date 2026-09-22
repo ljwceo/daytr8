@@ -18,6 +18,7 @@ struct DashboardFilterBar: View {
                 if !symbols.isEmpty { symbolMenu }
                 if !playbooks.isEmpty { playbookMenu }
                 if !confluences.isEmpty { confluenceMenu }
+                backtestToggle
             }
             .padding(.vertical, 2)
         }
@@ -100,6 +101,25 @@ struct DashboardFilterBar: View {
                 icon: "square.grid.2x2"
             )
         }
+    }
+
+    /// Backtest-trades meetellen of niet (standaard uit).
+    private var backtestToggle: some View {
+        Button {
+            viewModel.includeBacktest.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: viewModel.includeBacktest ? "checkmark.circle.fill" : "clock.arrow.circlepath")
+                    .font(.caption)
+                Text("Backtest").font(.subheadline.weight(.medium)).lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .foregroundStyle(Theme.textPrimary)
+            .background(viewModel.includeBacktest ? Theme.accent.opacity(0.85) : Theme.elevated)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func filterChip(title: String, isActive: Bool, icon: String) -> some View {

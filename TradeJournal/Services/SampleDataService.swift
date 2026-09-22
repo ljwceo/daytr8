@@ -233,7 +233,8 @@ public enum SampleDataService {
     }
 
     /// Verwijdert **alle** door de app beheerde data (accounts, trades,
-    /// executions, playbooks, journals, tags, mistakes, screenshots).
+    /// executions, playbooks, journals, tags, mistakes, screenshots, templates,
+    /// dagelijkse regels en notebook-notities).
     /// De standaardconfluences en instrumentpresets worden op de volgende
     /// call van `SeedService.seedDefaultsIfNeeded` opnieuw aangemaakt.
     ///
@@ -253,6 +254,10 @@ public enum SampleDataService {
         batchDelete(Playbook.self, in: context)
         batchDelete(DailyJournalScreenshot.self, in: context)
         batchDelete(DailyJournal.self, in: context)
+        batchDelete(NotebookNote.self, in: context)
+        batchDelete(DailyRuleCheck.self, in: context)
+        batchDelete(DailyRule.self, in: context)
+        batchDelete(JournalTemplate.self, in: context)
         batchDelete(Tag.self, in: context)
         batchDelete(Mistake.self, in: context)
         batchDelete(Confluence.self, in: context)

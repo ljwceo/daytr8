@@ -128,6 +128,10 @@ public final class Trade {
     @Relationship
     public var mistakes: [Mistake] = []
 
+    /// Notebook-notities die aan deze trade gekoppeld zijn (many-to-many).
+    @Relationship
+    public var notebookNotes: [NotebookNote] = []
+
     // MARK: - Init
 
     public init(
@@ -205,6 +209,12 @@ public final class Trade {
     /// True als de trade nog open is (geen `exitDate` én geen `exitPrice`).
     public var isOpen: Bool {
         exitDate == nil && exitPrice == nil && executions.filter({ $0.isExit(for: direction) }).isEmpty
+    }
+
+    /// `false` voor backtest-trades (vlag op de trade of backtest-account), zodat
+    /// ze de live statistieken, kalender en progress tracker niet vervuilen.
+    public var countsInLiveStats: Bool {
+        !isBacktest && (account?.type.countsInLiveStats ?? true)
     }
 
     /// Duur van de trade in seconden. `nil` als de trade nog open is.

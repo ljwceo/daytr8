@@ -81,6 +81,9 @@ public struct BackupService {
         let playbooks = fetch(Playbook.self, in: context)
         let trades = fetch(Trade.self, in: context)
         let journals = fetch(DailyJournal.self, in: context)
+        let templates = fetch(JournalTemplate.self, in: context)
+        let dailyRules = fetch(DailyRule.self, in: context)
+        let notes = fetch(NotebookNote.self, in: context)
 
         var tradeDTOs: [BackupPayload.TradeDTO] = []
         tradeDTOs.reserveCapacity(trades.count)
@@ -157,7 +160,31 @@ public struct BackupService {
             )
         }
 
-        let payload = BackupPayload(
+        let templateDTOs: [BackupPayload.JournalTemplateDTO] = templates.map { template in
+            BackupPayload.JournalTemplateDTO(
+                id: template.id, kind: template.kindRaw, name: template.name, body: template.body,
+                isDefault: template.isDefault, isBuiltIn: template.isBuiltIn, sortOrder: template.sortOrder,
+                createdAt: template.createdAt, updatedAt: template.updatedAt
+            )
+        }
+        let ruleDTOs: [BackupPayload.DailyRuleDTO] = dailyRules.map { rule in
+            let checkDTOs: [BackupPayload.DailyRuleCheckDTO] = rule.checks
+                .sorted { $0.date < $1.date }
+                .map { check in BackupPayload.DailyRuleCheckDTO(id: check.id, date: check.date, isFollowed: check.isFollowed) }
+            return BackupPayload.DailyRuleDTO(
+                id: rule.id, name: rule.name, kind: rule.kindRaw, threshold: rule.threshold,
+                isActive: rule.isActive, sortOrder: rule.sortOrder, createdAt: rule.createdAt, checks: checkDTOs
+            )
+        }
+        let noteDTOs: [BackupPayload.NotebookNoteDTO] = notes.map { note in
+            BackupPayload.NotebookNoteDTO(
+                id: note.id, title: note.title, body: note.body, isPinned: note.isPinned,
+                linkedDate: note.linkedDate, createdAt: note.createdAt, updatedAt: note.updatedAt,
+                tradeIDs: note.trades.map(\.id)
+            )
+        }
+
+        var payload = BackupPayload(
             formatVersion: BackupPayload.currentFormatVersion,
             exportedAt: now,
             appVersion: Self.appVersion,
@@ -170,6 +197,9 @@ public struct BackupService {
             trades: tradeDTOs,
             dailyJournals: journalDTOs
         )
+        payload.journalTemplates = templateDTOs
+        payload.dailyRules = ruleDTOs
+        payload.notebookNotes = noteDTOs
 
         try writer.addFile(path: Self.payloadPath, data: try Self.encoder.encode(payload), compress: true)
         try writer.finish()
@@ -296,6 +326,7 @@ public struct BackupService {
             playbooks[dto.id] = playbook
         }
 
+        var tradesByID: [UUID: Trade] = [:]
         for dto in payload.trades {
             let trade = Trade(
                 id: dto.id, symbol: dto.symbol, direction: TradeDirection(rawValue: dto.direction) ?? .long,
@@ -310,6 +341,7 @@ public struct BackupService {
                 createdAt: dto.createdAt, updatedAt: dto.updatedAt
             )
             context.insert(trade)
+            tradesByID[dto.id] = trade
             trade.account = dto.accountID.flatMap { accounts[$0] }
             trade.instrument = dto.instrumentID.flatMap { instruments[$0] }
             trade.playbook = dto.playbookID.flatMap { playbooks[$0] }
@@ -364,8 +396,47 @@ public struct BackupService {
             journal.screenshots = screenshots
         }
 
+        restoreFormatVersion2(payload, trades: tradesByID, into: context)
+
         try context.save()
         return backup.summary
+    }
+
+    /// Templates, dagelijkse regels en notebook (formaatversie 2). Bij een
+    /// versie 1-backup zijn deze `nil`; de standaardtemplates en -regels komen
+    /// dan via `SeedService` bij de volgende app-start terug.
+    private func restoreFormatVersion2(_ payload: BackupPayload, trades: [UUID: Trade], into context: ModelContext) {
+        for dto in payload.journalTemplates ?? [] {
+            context.insert(JournalTemplate(
+                id: dto.id, kind: JournalTemplateKind(rawValue: dto.kind) ?? .preMarket,
+                name: dto.name, body: dto.body, isDefault: dto.isDefault, isBuiltIn: dto.isBuiltIn,
+                sortOrder: dto.sortOrder, createdAt: dto.createdAt, updatedAt: dto.updatedAt
+            ))
+        }
+
+        for dto in payload.dailyRules ?? [] {
+            let rule = DailyRule(
+                id: dto.id, name: dto.name, kind: DailyRuleKind(rawValue: dto.kind) ?? .manual,
+                threshold: dto.threshold, isActive: dto.isActive, sortOrder: dto.sortOrder, createdAt: dto.createdAt
+            )
+            context.insert(rule)
+            var checks: [DailyRuleCheck] = []
+            for item in dto.checks {
+                let check = DailyRuleCheck(id: item.id, date: item.date, isFollowed: item.isFollowed)
+                context.insert(check)
+                checks.append(check)
+            }
+            rule.checks = checks
+        }
+
+        for dto in payload.notebookNotes ?? [] {
+            let note = NotebookNote(
+                id: dto.id, title: dto.title, body: dto.body, isPinned: dto.isPinned,
+                linkedDate: dto.linkedDate, createdAt: dto.createdAt, updatedAt: dto.updatedAt
+            )
+            context.insert(note)
+            note.trades = dto.tradeIDs.compactMap { trades[$0] }
+        }
     }
 
     // MARK: - Helpers

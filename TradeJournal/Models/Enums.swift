@@ -135,3 +135,64 @@ public enum TradeOutcome: String, Codable, CaseIterable, Sendable {
     case breakeven
     case open
 }
+
+/// Soort daily journal-template: vóór of na de handelsdag.
+public enum JournalTemplateKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case preMarket = "pre_market"
+    case postMarket = "post_market"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .preMarket: return "Pre-market"
+        case .postMarket: return "Post-market review"
+        }
+    }
+}
+
+/// Soort dagelijkse regel in de progress tracker.
+///
+/// `manual` wordt door de gebruiker afgevinkt; de overige soorten worden
+/// automatisch beoordeeld op basis van de trades en het journal van die dag,
+/// met `DailyRule.threshold` als grenswaarde.
+public enum DailyRuleKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case manual
+    case maxTrades = "max_trades"
+    case stopAfterLosses = "stop_after_losses"
+    case maxDailyLoss = "max_daily_loss"
+    case journalFilled = "journal_filled"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .manual: return "Handmatig afvinken"
+        case .maxTrades: return "Max aantal trades"
+        case .stopAfterLosses: return "Stop na X verliezen"
+        case .maxDailyLoss: return "Max verlies per dag"
+        case .journalFilled: return "Journal ingevuld"
+        }
+    }
+
+    /// Of de regel automatisch uit de data beoordeeld wordt.
+    public var isAutomatic: Bool { self != .manual }
+
+    /// Of de regel een grenswaarde (`threshold`) gebruikt.
+    public var usesThreshold: Bool {
+        switch self {
+        case .maxTrades, .stopAfterLosses, .maxDailyLoss: return true
+        case .manual, .journalFilled: return false
+        }
+    }
+
+    /// Redelijke standaardgrens bij het aanmaken van een nieuwe regel.
+    public var defaultThreshold: Double {
+        switch self {
+        case .maxTrades: return 3
+        case .stopAfterLosses: return 2
+        case .maxDailyLoss: return 500
+        case .manual, .journalFilled: return 0
+        }
+    }
+}
