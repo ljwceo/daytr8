@@ -59,3 +59,21 @@ enum Theme {
         return neutral
     }
 }
+
+extension Color {
+    /// Parseert een hex-kleurcode ("#RRGGBB" of "RRGGBB"), zoals opgeslagen op
+    /// `Confluence`/`Tag`/`Mistake`/`Playbook`, naar een `Color`. Valt terug
+    /// op `Theme.neutral` bij een ongeldige string.
+    init(hex: String) {
+        var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        sanitized.removeAll { $0 == "#" }
+        guard sanitized.count == 6, let value = UInt64(sanitized, radix: 16) else {
+            self = Theme.neutral
+            return
+        }
+        let r = Double((value >> 16) & 0xFF) / 255
+        let g = Double((value >> 8) & 0xFF) / 255
+        let b = Double(value & 0xFF) / 255
+        self = Color(red: r, green: g, blue: b)
+    }
+}

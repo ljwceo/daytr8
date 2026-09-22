@@ -4,10 +4,11 @@ Native iOS day-trading journal in Swift/SwiftUI. Volledig offline, geen accounts
 geen backend, geen betaalde developer-entitlements nodig. De app wordt **unsigned**
 gebouwd via GitHub Actions en gesignd/gesideload via [Signulous](https://signulous.com/).
 
-Status: **fase 0** — projectskelet met een lege TabView (Dashboard, Kalender, Trades,
-Rapporten, Meer) en een werkende CI die een unsigned `.ipa` bouwt. Zie
-[`SPEC.md`](SPEC.md) voor de volledige productscope en
-[`PROGRESS.md`](PROGRESS.md) voor de voortgang per fase.
+Status: **fase 2** — SwiftData-datamodel met statistieken en seed-data (fase 1),
+en een werkend trade log met tradedetail en een slim tradeformulier (fase 2).
+Dashboard, Kalender en Rapporten zijn nog placeholders. Zie [`SPEC.md`](SPEC.md)
+voor de volledige productscope en [`PROGRESS.md`](PROGRESS.md) voor de
+voortgang per fase.
 
 ## Technische basis
 
