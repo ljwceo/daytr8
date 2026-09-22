@@ -549,8 +549,9 @@ Nieuwe tests (`TradeJournalTests/`)
 - [x] Waarschuwing als de laatste backup ouder is dan 7 dagen.
 - [x] Unit tests voor CSV-parser, import, fill-aggregatie, export, zip en backup.
 - [x] `PROGRESS.md` en `README.md` bijgewerkt.
-- [ ] Unit tests lokaal draaien (`xcodebuild test`) — in deze sessie was geen
-      Swift-toolchain beschikbaar.
+- [x] Groene CI-run (unsigned IPA-build, workflow_dispatch op deze branch).
+- [ ] Unit tests lokaal draaien (`xcodebuild test`) — de CI bouwt alleen de
+      app en in deze sessie was geen Swift-toolchain beschikbaar.
 
 ### Openstaande punten
 
