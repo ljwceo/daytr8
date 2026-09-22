@@ -62,19 +62,113 @@ Resources
 - [x] README met Signulous-installatie-uitleg.
 - [x] `CLAUDE.md` met architectuurafspraken.
 - [x] `PROGRESS.md` bijgewerkt.
+- [x] Groene CI-run bevestigd.
+
+## Fase 1 — SwiftData-datamodel, presets, statistieken & seed ✅
+
+Doel: het complete datamodel uit `SPEC.md` §3 werkend krijgen, inclusief partial
+exits, instrumentpresets (NQ, MNQ, ES, MES, YM, GC, CL, forex), de standaard
+confluence-set uit §4, alle relevante berekeningen (P&L, R-multiple, win rate,
+profit factor, expectancy, drawdown, streaks) in een testbare service, en
+een voorbeelddata-generator die ~2 jaar aan trades produceert. Nog geen UI —
+schermen komen in latere fases.
+
+### Aangemaakte / gewijzigde bestanden
+
+Configuratie
+- `project.yml` — tweede target `TradeJournalTests` (unit-test bundle op iOS 17,
+  ongesigneerd) toegevoegd, plus expliciete `schemes.TradeJournal` waarin
+  alleen de app-target voor `build` gebruikt wordt zodat de CI-workflow
+  niets extra's meebouwt. De tests worden via `xcodebuild test` (of Cmd+U
+  in Xcode) uitgevoerd.
+
+Nieuwe SwiftData-modellen (`TradeJournal/Models/`)
+- `Enums.swift` — `AccountType`, `TradeDirection`, `Session`,
+  `ConfluenceCategory`, `InstrumentCategory`, `TradeOutcome`.
+- `Account.swift` — accountnaam, type, startbalans, broker, valuta, optionele
+  prop-firm limits (`maxDrawdown`, `dailyLossLimit`), `monthlyProfitTarget`.
+- `Instrument.swift` — verhandelbaar instrument met `tickSize`, `tickValue`,
+  categorie en `pointValue`-helper. `isBuiltIn` markeert de meegeleverde presets.
+- `Trade.swift` — volledige trade uit `SPEC.md §3` met snapshot-tick-info,
+  `plannedRisk`, `mae`/`mfe`, playbook, confluences/tags/mistakes (many-to-many),
+  screenshots en per-regel adherence.
+- `TradeExecution.swift` — partial exits met signed quantity (positief = koop,
+  negatief = verkoop) + eigen commissie/fees per fill.
+- `TradeScreenshot.swift` — losse afbeelding bij een trade, extern opgeslagen.
+- `Confluence.swift` — many-to-many gekoppeld aan `Trade` en `Playbook`.
+- `Tag.swift`, `Mistake.swift` — losse labels + fouten (many-to-many op `Trade`).
+- `Playbook.swift` — playbook + `PlaybookRule` (checklist) + `PlaybookRuleAdherence`
+  (koppeling die per trade/regel bijhoudt of de regel gevolgd is).
+- `DailyJournal.swift` — dagboek per handelsdag met pre-/post-market templates,
+  mood, cijfer + `DailyJournalScreenshot`.
+- `AppSchema.swift` — één plek waar alle `@Model`-types samenkomen voor
+  `ModelContainer` en de tests.
+
+Nieuwe services (`TradeJournal/Services/`)
+- `InstrumentPresets.swift` — puur (geen SwiftData) — definities voor NQ, MNQ,
+  ES, MES, YM, MYM, RTY, M2K, GC, MGC, SI, CL, MCL, NG en de grootste forex-paren
+  (EURUSD, GBPUSD, AUDUSD, NZDUSD, USDCAD, USDCHF, USDJPY, EURJPY, GBPJPY).
+- `DefaultConfluences.swift` — puur — de volledige standaardset uit `SPEC.md §4`
+  (Bias, PD Arrays, Liquiditeit, Structuur, Tijd, Overig) met SF Symbol-iconen.
+- `SessionCalculator.swift` — bepaalt Asia/London/NY AM/NY PM op basis van een
+  instelbare tijdzone (standaard `America/New_York`) en aanpasbare tijdvensters.
+- `StatsService.swift` — bruto/netto P&L (met en zonder executions), R-multiple,
+  aggregatie (win rate, profit factor, expectancy, avg win/loss, largest win/loss,
+  max drawdown + %, current/longest win/loss streak) en cumulatieve equity-curve.
+- `SeedService.swift` — idempotent inschieten van instrumentpresets en
+  standaardconfluences op de eerste app-start.
+- `SampleDataService.swift` — deterministische generator (`SeededRandom`) die
+  ~2 jaar aan realistische trades produceert (met accounts, playbook + regels,
+  tags, mistakes, confluences en rule-adherence) én een `wipeAll` om de
+  database volledig leeg te maken.
+
+App-integratie
+- `App/TradeJournalApp.swift` — bouwt één centrale `ModelContainer` met het
+  volledige `AppSchema.models`, injecteert via `.modelContainer(...)` en
+  draait `SeedService.seedDefaultsIfNeeded` in een `.task` op de root view.
+- `Views/More/MoreView.swift` — voorlopige "Meer"-tab met een overzichts-sectie
+  (aantallen accounts/trades/confluences/instrumenten) en drie debug-knoppen
+  ("Standaarddata inschieten", "Voorbeelddata genereren", "Alles wissen" met
+  bevestigingsdialoog).
+
+Nieuwe test-target (`TradeJournalTests/`)
+- `InstrumentPresetsTests.swift` — controleert dat NQ/MNQ/ES/MES/YM/GC/CL en de
+  forex-paren aanwezig zijn, de tick-waarden matchen met de CME-specs en dat
+  symbolen uniek zijn.
+- `SessionCalculatorTests.swift` — 4 standaardvensters, inclusieve start /
+  exclusieve eind, wrapping rond middernacht (Asia), buiten alle vensters →
+  `.other`, tijdzone-conversie (Amsterdam → NY), custom configuratie.
+- `StatsServiceTests.swift` — long/short win + loss, open trade, breakeven,
+  R-multiple via plannedRisk én via stop-afstand, partial exits (volledig +
+  gedeeltelijk gesloten), aggregatie (win rate/PF/expectancy/streaks/max DD),
+  gemiddelde R-multiple, equity-curve, session-recompute.
+- `SeedAndSampleDataTests.swift` — draait tegen een in-memory `ModelContainer`:
+  seed insert-count matcht `InstrumentPresets`/`DefaultConfluences`, seed is
+  idempotent, sample-generator produceert >50 trades met confluences + accounts,
+  `wipeAll` maakt alles leeg, en de generator is deterministisch per seed.
+
+### Definition of done voor fase 1
+
+- [x] Alle SwiftData-modellen uit `SPEC.md §3` (inclusief partial exits en
+      many-to-many relaties voor confluences/tags/mistakes).
+- [x] Instrumentpresets voor NQ, MNQ, ES, MES, YM, GC, CL en de grootste forex-paren.
+- [x] `StatsService` met de complete rekenkern (P&L, R, win rate, PF, expectancy,
+      avg win/loss, max DD, streaks) en `SessionCalculator` met instelbare tijdzone.
+- [x] Standaard confluence-set wordt bij de eerste start ingeschoten.
+- [x] Voorbeelddata-generator (~2 jaar) en "alles wissen"-functie, bereikbaar
+      via de Meer-tab.
+- [x] Unit tests voor alle berekeningen en de seed/sample-data services.
+- [x] `PROGRESS.md` en `CLAUDE.md` bijgewerkt.
 - [ ] Groene CI-run — bevestigen zodra de branch gepusht is.
 
-## Volgende fase — Fase 1: SwiftData-datamodel & app-container
+## Volgende fase — Fase 2: Trade log & tradeformulier
 
-Op basis van `SPEC.md` §3 (datamodel):
+Vooruitkijkend op basis van `SPEC.md §8`:
 
-- `TradeJournalTests`-target toevoegen aan `project.yml`.
-- SwiftData `@Model`-types: `Account`, `Trade`, `TradeExecution`, `Confluence`,
-  `Playbook`, `PlaybookRule`, `DailyJournal`, `Tag`, `Mistake`, plus de bijbehorende
-  enums (`AccountType`, `TradeDirection`, `Session`).
-- `ModelContainer` opzetten in `TradeJournalApp` en injecteren via
-  `.modelContainer(...)`.
-- Rekenlogica op `Trade` (bruto/netto P&L, R-multiple, sessie-afleiding uit tijdzone)
-  met bijbehorende unit tests.
-- Voorbeelddata-generator (voorlopig achter een debug-knop in `MoreView`) om
-  het model tijdens ontwikkeling te vullen.
+- Trade log met doorzoekbare, sorteerbare lijst, snelfilters en swipe-acties
+  (bewerken, dupliceren, verwijderen).
+- Tradedetail met alle velden, screenshots fullscreen, confluence-chips en
+  playbook-checklist.
+- Slim tradeformulier met standaardwaarden uit de laatste trade,
+  automatische P&L/R-berekening via instrumentpreset, sessie-autodetectie.
+- ViewModels + services voor het bewerken en dupliceren van trades.
