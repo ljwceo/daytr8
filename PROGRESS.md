@@ -428,8 +428,12 @@ Nieuwe tests (`TradeJournalTests/`)
       `DashboardFilterBar`; nieuwe aggregatie-service in `Services/`.
 - [x] Unit tests voor alle breakdown-dimensies en de viewmodel.
 - [x] `PROGRESS.md` bijgewerkt.
-- [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
-      GitHub Actions-build; niet in deze sessie uitgevoerd).
+- [x] Groene CI-run bevestigd (workflow_dispatch op deze branch, run #8:
+      https://github.com/ljwceo/daytr8/actions/runs/35787506777). Run #7
+      faalde eerst op een pre-existente bug uit fase 3 — `.frame(width:
+      52, minHeight: 56)` in `CalendarMonthGridView.swift` is geen geldige
+      SwiftUI-overload — gefixt door de aanroep in twee `.frame(...)`-
+      modifiers te splitsen.
 
 ## Volgende fase — Fase 5: Import en export
 
