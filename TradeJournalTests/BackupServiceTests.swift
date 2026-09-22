@@ -247,4 +247,75 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(BackupService.fileExtension(for: pngData), "png")
         XCTAssertEqual(BackupService.fileExtension(for: Data([1, 2, 3])), "bin")
     }
+
+    // MARK: - Formaatversie 2 (fase 6)
+
+    func test_roundTrip_restoresTemplatesRulesAndNotes() throws {
+        let fixture = try makeFixture()
+        let template = JournalTemplate(kind: .postMarket, name: "Review", body: "Les: {{datum}}", isDefault: true)
+        let rule = DailyRule(name: "Max 3 trades", kind: .maxTrades, threshold: 3, sortOrder: 2)
+        let check = DailyRuleCheck(date: Date(timeIntervalSince1970: 1_700_000_000), isFollowed: false)
+        let note = NotebookNote(title: "Les", body: "Niet chasen", isPinned: true, linkedDate: Date(timeIntervalSince1970: 1_700_000_000))
+        context.insert(template)
+        context.insert(rule)
+        context.insert(check)
+        context.insert(note)
+        check.rule = rule
+        note.trades = [fixture.trade]
+        try context.save()
+
+        let url = try service.exportBackup(from: context, to: directory)
+        let loaded = try service.loadBackup(at: url)
+        XCTAssertEqual(loaded.summary.formatVersion, 2)
+        try service.restore(loaded, into: context)
+
+        let templates = try context.fetch(FetchDescriptor<JournalTemplate>())
+        XCTAssertEqual(templates.count, 1)
+        XCTAssertEqual(templates.first?.id, template.id)
+        XCTAssertEqual(templates.first?.kind, .postMarket)
+        XCTAssertEqual(templates.first?.isDefault, true)
+
+        let rules = try context.fetch(FetchDescriptor<DailyRule>())
+        XCTAssertEqual(rules.count, 1)
+        XCTAssertEqual(rules.first?.kind, .maxTrades)
+        XCTAssertEqual(rules.first?.threshold, 3)
+        XCTAssertEqual(rules.first?.checks.count, 1)
+        XCTAssertEqual(rules.first?.checks.first?.isFollowed, false)
+
+        let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+        XCTAssertEqual(notes.count, 1)
+        XCTAssertEqual(notes.first?.isPinned, true)
+        XCTAssertEqual(notes.first?.trades.map(\.id), [fixture.trade.id])
+        XCTAssertEqual(notes.first?.linkedDate, note.linkedDate)
+    }
+
+    func test_loadBackup_acceptsVersion1PayloadWithoutPhase6Fields() throws {
+        try makeFixture()
+        let url = try service.exportBackup(from: context, to: directory)
+        var payload = try BackupService.decoder.decode(
+            BackupPayload.self,
+            from: try ZipReader(url: url).data(for: BackupService.payloadPath)
+        )
+        payload.formatVersion = 1
+        payload.journalTemplates = nil
+        payload.dailyRules = nil
+        payload.notebookNotes = nil
+
+        let json = try BackupService.encoder.encode(payload)
+        // Een echte versie 1-backup kent deze sleutels helemaal niet.
+        let text = String(decoding: json, as: UTF8.self)
+        XCTAssertFalse(text.contains("journalTemplates"))
+
+        let older = directory.appendingPathComponent("v1.zip")
+        let writer = try ZipWriter(url: older)
+        try writer.addFile(path: BackupService.payloadPath, data: json)
+        try writer.finish()
+
+        let loaded = try service.loadBackup(at: older)
+        XCTAssertEqual(loaded.summary.formatVersion, 1)
+        XCTAssertNil(loaded.payload.dailyRules)
+        try service.restore(loaded, into: context)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Trade>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<DailyRule>()), 0)
+    }
 }

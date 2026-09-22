@@ -112,6 +112,30 @@ Alles staat onder **Meer → Data**:
 - **Trades exporteren als CSV** levert één rij per trade op; dit bestand kan
   ook weer geïmporteerd worden.
 
+### 5. Journal, doelen en beveiliging
+
+- **Meer → Journal → Progress tracker**: dagelijkse regels (bijv. *max 3
+  trades*, *stop na 2 verliezen*, *journal ingevuld*) met huidige/langste
+  streak, consistentie en een consistentie-kalender. Automatische regels worden
+  uit je trades en journal beoordeeld, handmatige vink je af (ook in het
+  dagdetail in de kalender).
+- **Journal-templates**: bewerkbare pre-market- en post-market-templates, in
+  het dagjournal in te voegen via *Template invoegen*. `{{datum}}` wordt de
+  datum van die dag.
+- **Notebook**: losse notities en lessen, vast te pinnen en te koppelen aan
+  een dag en/of trades (ook vanuit tradedetail en dagdetail).
+- **Meer → Accounts & doelen**: per account een maandelijks P&L-doel, daily
+  loss limit en max drawdown. Het dashboard toont voortgangsbalken en
+  waarschuwt vanaf 80% van een limiet. Backtest-accounts (en trades gemarkeerd
+  als backtest) tellen niet mee in dashboard, rapporten, kalender en progress
+  tracker, tenzij je de *Backtest*-filter aanzet.
+- **Meer → Instellingen**: een lokale *vul je journal in*-herinnering op een
+  instelbaar tijdstip, en een optioneel app-slot met Face ID / Touch ID /
+  toegangscode.
+
+Backups bevatten sinds deze versie (formaatversie 2) ook templates, regels en
+notities; oudere backups blijven gewoon te herstellen.
+
 ## Repostructuur
 
 ```

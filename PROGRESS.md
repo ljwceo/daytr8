@@ -564,13 +564,112 @@ Nieuwe tests (`TradeJournalTests/`)
 - De automatische backup draait alleen als de app geopend wordt (geen
   Background Modes, conform `CLAUDE.md`).
 
-## Volgende fase — Fase 6: Extra TradeZella-achtige functies
+## Fase 6 — Extra TradeZella-achtige functies ✅
 
-Vooruitkijkend op basis van `SPEC.md §10` (en §12 OCR, zie SPEC):
+Doel: `SPEC.md §10` — bewerkbare daily journal-templates, progress tracker met
+dagelijkse regels, streak en consistentie-kalender, doelen/limieten per
+account met waarschuwing, backtest-modus, notebook, lokale herinneringen en
+een optioneel Face ID-/code-slot.
 
-- Daily journal-templates (pre-market / post-market) bewerkbaar.
-- Progress tracker met dagelijkse regels, streak- en consistentie-kalender.
-- Doelen: maandelijks P&L-doel, max daily loss, max drawdown voor prop firm
-  accounts met voortgangsbalk en waarschuwing.
-- Notebook, lokale herinneringen (`UNUserNotificationCenter`) en optioneel
-  Face ID / code-slot (`LocalAuthentication`).
+Vooraf (zelfde branch): fix voor "Alles wissen" — `SampleDataService.wipeAll`
+gebruikt nu per type een batch-delete (`ModelContext.delete(model:)`) in plaats
+van object-voor-object verwijderen (dat was bij jaren aan data traag en kon de
+app laten crashen); `TradeDetailView` toont een melding voor een intussen
+gewiste trade en `MoreView` een spinner tijdens het wissen.
+
+### Aangemaakte / gewijzigde bestanden
+
+Modellen (`TradeJournal/Models/`)
+- `JournalTemplate.swift` — pre-/post-market-template (soort, naam, tekst,
+  standaardvlag).
+- `DailyRule.swift` — `DailyRule` (naam, soort, grens, actief, volgorde,
+  aanmaakdatum) en `DailyRuleCheck` (afvinkstatus per dag, cascade).
+- `NotebookNote.swift` — notitie met titel, inhoud, vastpinnen, gekoppelde dag
+  en many-to-many naar `Trade` (`Trade.notebookNotes`).
+- `Enums.swift` — `JournalTemplateKind`, `DailyRuleKind`.
+- `Trade.swift` — `notebookNotes` en `countsInLiveStats` (backtest-vlag of
+  backtest-account).
+- `AppSchema.swift` — de vier nieuwe modellen.
+- `BackupPayload.swift` — formaatversie 2 met optionele `journalTemplates`,
+  `dailyRules` (+ checks) en `notebookNotes`; versie 1 blijft inleesbaar.
+
+Services (`TradeJournal/Services/`)
+- `JournalTemplateService.swift` — standaardtemplates, `{{datum}}` invullen,
+  template in een veld zetten zonder te dupliceren, create/update/setDefault/delete.
+- `ProgressTrackerService.swift` — regels per dag beoordelen (max trades, stop
+  na X verliezen, max dagverlies, journal ingevuld, handmatig), alle gevolgde
+  dagen in O(n), streak (vandaag breekt niet zolang de dag loopt) en
+  consistentie. Backtest-trades tellen niet mee.
+- `GoalsService.swift` — maanddoel, daily loss limit en trailing max drawdown
+  per account, waarschuwing vanaf 80%.
+- `ReminderSettings.swift` / `ReminderService.swift` — lokale herhalende
+  melding (werkdagen of dagelijks) via `UNUserNotificationCenter`.
+- `AppLockService.swift` — `LocalAuthentication` (`.deviceOwnerAuthentication`),
+  instellingen en de pure beslisregel `shouldLock` (met grace period).
+- `SeedService.swift` — standaardtemplates en -regels (alleen als er nog geen zijn).
+- `BackupService.swift` — export/restore van de nieuwe entiteiten.
+- `SampleDataService.swift` — `wipeAll` wist ook de nieuwe modellen.
+
+Viewmodels (`TradeJournal/ViewModels/`)
+- Nieuw: `AccountFormViewModel`, `ProgressTrackerViewModel` (incl.
+  heatmap-raster, afvinken, regelbeheer), `NotebookViewModel`,
+  `AppLockViewModel`, `ReminderSettingsViewModel`.
+- `DashboardViewModel` — `includeBacktest` (standaard uit; een expliciet
+  gekozen account telt altijd mee) en `goalStatuses`.
+- `DayDetailViewModel` — `applyTemplate`.
+- `CalendarViewModel` — `visibleTrades` + `@AppStorage`-sleutel voor backtest.
+
+Views
+- `Views/More/`: `AccountsView`, `AccountFormView`, `ProgressTrackerView`,
+  `DailyRulesView`, `NotebookView`, `NoteEditorView`, `JournalTemplatesView`,
+  `ReminderSettingsView`, `AppLockSettingsView`; `MoreView` met nieuwe secties
+  Journal / Accounts / Instellingen.
+- `Views/Components/`: `RuleChecklistView`, `ConsistencyHeatmapView`,
+  `NoteRowView`, `AppLockOverlayView`.
+- `Views/Dashboard/`: `GoalsCardView`, `GoalWarningBannerView`; dashboard toont
+  ze, filterbalk kreeg een *Backtest*-schakelaar.
+- `Views/Calendar/`: backtest-schakelaar in de kalender; dagdetail met
+  *Template invoegen*, regelchecklist en gekoppelde notities.
+- `Views/Trades/TradeDetailView.swift` — notebook-kaart.
+- `App/TradeJournalApp.swift` — app-slot-overlay en scene-phase-afhandeling.
+
+Tests (`TradeJournalTests/`)
+- Nieuw: `ProgressTrackerServiceTests`, `GoalsServiceTests`,
+  `JournalTemplateServiceTests` (incl. seeds), `ProgressTrackerViewModelTests`,
+  `NotebookViewModelTests`, `AccountFormViewModelTests`,
+  `AppLockAndReminderTests`.
+- Uitgebreid: `BackupServiceTests` (roundtrip v2, v1 zonder nieuwe velden),
+  `DashboardViewModelTests` (backtest-filter).
+
+### Definition of done voor fase 6
+
+- [x] Daily journal met bewerkbare pre-market- en post-market-templates.
+- [x] Progress tracker: dagelijkse regels afvinken/automatisch beoordelen, met
+      streak en consistentie-kalender.
+- [x] Doelen: maandelijks P&L-doel, daily loss limit, max drawdown met
+      voortgangsbalk en waarschuwing dicht bij de limiet.
+- [x] Backtest-modus: backtest-trades vervuilen de live statistieken niet.
+- [x] Notebook met koppeling aan trades en dagen.
+- [x] Lokale herinnering op instelbaar tijdstip.
+- [x] Optioneel Face ID / code-slot bij openen.
+- [x] Backups bevatten de nieuwe data (formaatversie 2, v1 blijft werken).
+- [x] Groene CI-run (unsigned IPA-build, workflow_dispatch op deze branch).
+- [ ] Unit tests lokaal draaien (`xcodebuild test`) — de CI bouwt alleen de
+      app en in deze sessie was geen Swift-toolchain beschikbaar.
+
+### Openstaande punten
+
+- Herinneringen en app-slot zijn niet op een echt toestel getest (vereisen
+  meldingen-toestemming en Face ID).
+- Automatische regels hebben geen handmatige override; wie een regel anders
+  wil laten tellen, kan hem als handmatige regel aanmaken.
+- Nieuwe/verwijderde templates en regels komen via de seed alleen terug als
+  er van die soort helemaal niets meer is.
+
+## Volgende fase — Fase 7: Screenshot import (OCR)
+
+Op basis van `SPEC.md §12`: "Vul in vanuit screenshot" in het tradeformulier
+met Vision-OCR (`VNRecognizeTextRequest`), `ScreenshotParser` met
+broker-templates als JSON-resources, "uit OCR"-markeringen en alternatieven
+per veld, screenshot automatisch als bijlage, en parser-tests met
+tekstfixtures per broker.
