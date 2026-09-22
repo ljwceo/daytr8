@@ -1,0 +1,64 @@
+name: TradeJournal
+options:
+  bundleIdPrefix: com.tradejournal
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGNING_ALLOWED: NO
+    ENABLE_BITCODE: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  TradeJournal:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TradeJournal
+        excludes:
+          - "Resources/Info.plist"
+    resources:
+      - TradeJournal/Resources/Assets.xcassets
+    info:
+      path: TradeJournal/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: TradeJournal
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: ""
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIUserInterfaceStyle: Dark
+        NSPhotoLibraryUsageDescription: TradeJournal gebruikt je fotobibliotheek om screenshots aan je trades te koppelen.
+        NSPhotoLibraryAddUsageDescription: TradeJournal slaat screenshots op in je fotobibliotheek wanneer je dat kiest.
+        NSCameraUsageDescription: TradeJournal gebruikt de camera om screenshots van je charts direct aan je trades toe te voegen.
+        NSFaceIDUsageDescription: TradeJournal gebruikt Face ID om je journal te beveiligen wanneer je de app-vergrendeling inschakelt.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tradejournal.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        DEVELOPMENT_ASSET_PATHS: ""

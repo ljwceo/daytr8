@@ -1,0 +1,25 @@
+# Xcode / Swift
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+*.xcuserdatad/
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+Payload/
+
+# Swift Package Manager
+.build/
+Package.resolved
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# CI / logs
+*.log
