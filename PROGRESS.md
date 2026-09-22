@@ -161,14 +161,108 @@ Nieuwe test-target (`TradeJournalTests/`)
 - [x] `PROGRESS.md` en `CLAUDE.md` bijgewerkt.
 - [x] Groene CI-run bevestigd (workflow_dispatch op deze branch).
 
-## Volgende fase — Fase 2: Trade log & tradeformulier
+## Fase 2 — Trade log & tradeformulier ✅
 
-Vooruitkijkend op basis van `SPEC.md §8`:
+Doel: het trade log uit `SPEC.md §8` volledig werkend maken: een doorzoekbare,
+sorteerbare lijst met snelfilters en swipe-acties, een tradedetail-scherm met
+alle velden, en een slim tradeformulier voor zowel aanmaken als bewerken.
 
-- Trade log met doorzoekbare, sorteerbare lijst, snelfilters en swipe-acties
-  (bewerken, dupliceren, verwijderen).
-- Tradedetail met alle velden, screenshots fullscreen, confluence-chips en
-  playbook-checklist.
-- Slim tradeformulier met standaardwaarden uit de laatste trade,
-  automatische P&L/R-berekening via instrumentpreset, sessie-autodetectie.
-- ViewModels + services voor het bewerken en dupliceren van trades.
+### Aangemaakte / gewijzigde bestanden
+
+Nieuwe service (`TradeJournal/Services/`)
+- `TradeEditingService.swift` — `FormValues`, een waarde-type met alle
+  bewerkbare tradevelden, losstaand van SwiftData zodat het formulier live
+  kan valideren en voorrekenen. `createTrade`/`update` schrijven `FormValues`
+  weg (incl. confluences/tags/fouten en het herbouwen van de
+  `PlaybookRuleAdherence`-rijen van het gekozen playbook), `duplicate` maakt
+  een kopie met dezelfde setup maar lege resultaatvelden, `delete` verwijdert
+  een trade, en `addScreenshot`/`removeScreenshot` beheren losse screenshots.
+  `FormValues.makeDefault(basedOn:fallbackAccount:)` levert de
+  standaardwaarden voor een nieuwe trade (account/instrument/symbool/
+  richting/aantal/playbook overgenomen van de laatste trade).
+
+Nieuwe viewmodels (`TradeJournal/ViewModels/`)
+- `TradesListViewModel.swift` — zoekterm, snelfilter (alles/open/winst/
+  verlies/deze week/deze maand), richtingsfilter en sortering
+  (datum/P&L, op- of aflopend) als pure `filteredAndSorted(_:)`-functie;
+  dupliceren/verwijderen gaan via `TradeEditingService`.
+- `TradeFormViewModel.swift` — houdt `FormValues` bij voor zowel aanmaken
+  (`.create`, geprefilld vanuit de laatste trade) als bewerken (`.edit(Trade)`).
+  `livePreview` berekent P&L/R live door `StatsService` tegen een
+  niet-opgeslagen `Trade` te draaien; `detectedSession` toont de
+  automatisch bepaalde sessie. Toggle-helpers voor confluences/tags/fouten/
+  playbook-regels, plus `pendingScreenshots` voor nieuwe, nog niet
+  opgeslagen screenshots. `save(in:)` maakt aan of werkt bij.
+
+Nieuwe/gewijzigde views (`TradeJournal/Views/Trades/`)
+- `TradesView.swift` (was placeholder) — doorzoekbare (`.searchable`),
+  sorteerbare `List` met snelfilter-chips, swipe-acties (verwijderen met
+  bevestiging, dupliceren), toolbar-menu voor sorteren/richting, "+"-knop
+  die `TradeFormView` als sheet opent, en `navigationDestination(for: Trade.self)`
+  naar `TradeDetailView`.
+- `TradeRowView.swift` — richting-icoon, symbool, datum/sessie en netto
+  P&L/R-multiple (of "Open") per rij.
+- `TradeDetailView.swift` — alle velden in kaarten (resultaat, prijzen/risk,
+  confluence-chips, playbook-checklist met wel/niet gevolgd, tags/fouten,
+  reflectie, screenshots), toolbar-menu (bewerken/dupliceren/verwijderen),
+  screenshots tikken opent `ScreenshotViewerView`.
+- `TradeFormView.swift` — live P&L/R/sessie-preview bovenaan; secties voor
+  account, instrument (presets + handmatige tick size/value), richting/tijden
+  (met "trade is gesloten"-toggle voor exit-velden), prijzen/risk, kosten,
+  playbook + regel-checklist, confluences (gegroepeerd per categorie via
+  `FlowLayout`), tags/fouten, reflectie (emotie/rating/notities) en
+  screenshots (`PhotosPicker`, nieuw én bestaand, met verwijderen).
+- `ScreenshotViewerView.swift` — fullscreen pager (`TabView` page-style) met
+  pinch-to-zoom (`MagnificationGesture`) en dubbeltik-zoom per screenshot.
+
+Nieuwe herbruikbare componenten (`TradeJournal/Views/Components/`)
+- `ChipView.swift` — selecteerbare/alleen-lezen chip voor confluences, tags
+  en fouten.
+- `FlowLayout.swift` — eigen `Layout`-implementatie die chips laat omslaan
+  naar een nieuwe regel, gegroepeerd per categorie.
+- `StarRatingView.swift` — 1–5 sterren-rating (tik op huidige ster = wissen).
+
+Utilities
+- `Utilities/Theme.swift` — `Color(hex:)`-extensie toegevoegd om de
+  `colorHex`-velden van confluences/tags/fouten om te zetten naar chipkleuren.
+
+Nieuwe tests (`TradeJournalTests/`)
+- `TradeEditingServiceTests.swift` — aanmaken (incl. sessie-herberekening,
+  confluences/tags/rule-adherence), bijwerken (playbook wisselen herbouwt
+  rule-adherence), dupliceren (setup blijft, resultaat wordt leeg),
+  verwijderen (cascade naar screenshots), screenshots toevoegen/verwijderen,
+  en `FormValues.makeDefault`.
+- `TradesListViewModelTests.swift` — snelfilters (open/winst), richtingsfilter,
+  zoeken op symbool/playbook/tag, sortering op datum en P&L.
+- `TradeFormViewModelTests.swift` — validatie, live P&L/R-preview,
+  instrumentpreset toepassen, confluence/tag/fout-toggles, playbook-regels
+  resetten bij playbookwissel, opslaan in create- en edit-modus, prefill
+  vanuit de laatste trade.
+
+### Definition of done voor fase 2
+
+- [x] Trade log: doorzoekbaar, sorteerbaar, snelfilters, swipe-acties
+      (bewerken via navigatie naar detail, dupliceren, verwijderen met
+      bevestiging).
+- [x] Tradedetail: alle velden, screenshots fullscreen met pinch-to-zoom,
+      confluence-chips, playbook-checklist met wel/niet gevolgd.
+- [x] Tradeformulier: standaardwaarden uit de laatste trade, automatische
+      P&L/R-berekening via instrumentpreset (tick size/value), sessie-
+      autodetectie.
+- [x] ViewModels + services voor aanmaken/bewerken/dupliceren, unit-getest
+      zonder UI.
+- [x] `PROGRESS.md` bijgewerkt.
+- [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
+      GitHub Actions-build; niet in deze sessie uitgevoerd).
+
+## Volgende fase — Fase 3: Kalender & dashboard
+
+Vooruitkijkend op basis van `SPEC.md §5` en `§6`:
+
+- Kalender: maandweergave met netto P&L/aantal trades/win rate per dag,
+  weektotalen, jaaroverzicht (heatmap), dagdetail met intraday-P&L-grafiek
+  en snel een trade toevoegen.
+- Dashboard: filters (account/periode/symbool/playbook/confluence), kaarten
+  met de kernstatistieken, trading score (radar-chart), Swift Charts
+  (equity curve, dagelijkse P&L, drawdown), mini-kalender en recente trades.
+- Cache/aggregatie per dag zodat dit soepel blijft met jaren aan data.

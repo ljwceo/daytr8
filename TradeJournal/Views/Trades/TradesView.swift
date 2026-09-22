@@ -1,19 +1,138 @@
 import SwiftUI
+import SwiftData
 
-/// Placeholder voor de Trades-tab (trade log).
-/// Wordt in een latere fase een doorzoekbare lijst met tradedetail en snel-toevoegen.
+/// Trade log: doorzoekbare, sorteerbare lijst van alle trades met
+/// snelfilters, swipe-acties (dupliceren/verwijderen) en een link naar
+/// `TradeDetailView`. Nieuwe trades worden aangemaakt via `TradeFormView`.
 struct TradesView: View {
 
+    @Environment(\.modelContext) private var modelContext
+
+    @Query(sort: \Trade.entryDate, order: .reverse) private var trades: [Trade]
+    @Query(sort: \Account.createdAt) private var accounts: [Account]
+
+    @State private var viewModel = TradesListViewModel()
+    @State private var showingNewTrade = false
+    @State private var tradeToDelete: Trade?
+
+    private var visibleTrades: [Trade] {
+        viewModel.filteredAndSorted(trades)
+    }
+
     var body: some View {
-        PlaceholderView(
-            title: "Trades",
-            systemImage: "list.bullet.rectangle",
-            subtitle: "Doorzoekbare trade log met filters, swipe-acties en tradedetail."
-        )
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+
+                if trades.isEmpty {
+                    PlaceholderView(
+                        title: "Nog geen trades",
+                        systemImage: "list.bullet.rectangle",
+                        subtitle: "Tik op + om je eerste trade te loggen."
+                    )
+                } else {
+                    List {
+                        quickFilterRow
+
+                        ForEach(visibleTrades) { trade in
+                            NavigationLink(value: trade) {
+                                TradeRowView(trade: trade, metrics: viewModel.metrics(for: trade))
+                            }
+                            .listRowBackground(Theme.card)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    tradeToDelete = trade
+                                } label: {
+                                    Label("Verwijderen", systemImage: "trash")
+                                }
+                                Button {
+                                    viewModel.duplicate(trade, in: modelContext)
+                                } label: {
+                                    Label("Dupliceren", systemImage: "doc.on.doc")
+                                }
+                                .tint(Theme.accent)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.background)
+                    .searchable(text: $viewModel.searchText, prompt: "Zoek op symbool, playbook, tag...")
+                }
+            }
+            .navigationTitle("Trades")
+            .navigationDestination(for: Trade.self) { trade in
+                TradeDetailView(trade: trade)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sorteren", selection: $viewModel.sortOption) {
+                            ForEach(TradesListViewModel.SortOption.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        Picker("Richting", selection: $viewModel.directionFilter) {
+                            Text("Alle richtingen").tag(Optional<TradeDirection>.none)
+                            ForEach(TradeDirection.allCases) { direction in
+                                Text(direction.displayName).tag(Optional(direction))
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingNewTrade = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .sheet(isPresented: $showingNewTrade) {
+                TradeFormView(mode: .create, lastTrade: trades.first, fallbackAccount: accounts.first)
+            }
+            .confirmationDialog(
+                "Trade verwijderen?",
+                isPresented: Binding(get: { tradeToDelete != nil }, set: { if !$0 { tradeToDelete = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Verwijderen", role: .destructive) {
+                    if let trade = tradeToDelete {
+                        viewModel.delete(trade, from: modelContext)
+                    }
+                    tradeToDelete = nil
+                }
+                Button("Annuleren", role: .cancel) { tradeToDelete = nil }
+            }
+        }
+    }
+
+    private var quickFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TradesListViewModel.QuickFilter.allCases) { filter in
+                    ChipView(
+                        title: filter.displayName,
+                        color: Theme.accent,
+                        isSelected: viewModel.quickFilter == filter
+                    ) {
+                        viewModel.quickFilter = filter
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Theme.background)
     }
 }
 
 #Preview {
     TradesView()
+        .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }
