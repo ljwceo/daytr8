@@ -101,19 +101,32 @@ Regels:
 
 ## 6. Data-afhandeling
 
-- Alle persistente data via **SwiftData** met één `ModelContainer` op app-niveau
-  (aanmaken vanaf fase 1). Injecteer via `.modelContainer(...)` op de root scene
-  en gebruik `@Environment(\.modelContext)` in views die het écht nodig hebben.
+- Alle persistente data via **SwiftData** met één `ModelContainer` op app-niveau.
+  Het volledige schema staat in `Models/AppSchema.swift` (`AppSchema.models`);
+  zowel `TradeJournalApp` als de unit tests bouwen hun container hierop.
+  Injecteer via `.modelContainer(...)` op de root scene en gebruik
+  `@Environment(\.modelContext)` in views die het écht nodig hebben.
 - Zware queries / aggregaties (kalender, rapporten) niet in views — bouw ze in
   een service en cache per dag/maand.
+- Berekeningen (P&L, R, aggregaties) staan in `Services/StatsService.swift`;
+  sessie-detectie in `Services/SessionCalculator.swift`. Voeg nieuwe berekeningen
+  daar toe en dek ze af met unit tests.
+- Standaarddata (instrumentpresets, confluence-set) worden idempotent
+  ingeschoten door `Services/SeedService.swift` bij elke app-start.
 - Backup-/import-/export-formaat: JSON + losse afbeeldingen, verpakt in `.zip`.
   Houd het versienummer van het formaat in de payload op zodat migraties mogelijk zijn.
 
 ## 7. Testen
 
-- Unit tests voor pure berekeningen (P&L, R-multiple, statistiek) en de CSV-parser.
-  Testen komen vanaf fase 1 in een aparte `TradeJournalTests`-target die aan
-  `project.yml` wordt toegevoegd.
+- Unit tests voor pure berekeningen (P&L, R-multiple, statistiek) en de CSV-parser
+  staan in de aparte `TradeJournalTests`-target (`bundle.unit-test`, iOS 17,
+  ongesigneerd). Bestanden onder `TradeJournalTests/` worden automatisch door
+  XcodeGen opgepakt via `sources: - path: TradeJournalTests`.
+- De CI-workflow bouwt alleen de app (`xcodebuild build -scheme TradeJournal`);
+  tests draai je lokaal met Cmd+U of `xcodebuild test -scheme TradeJournal`.
+- Tests die tegen SwiftData-modellen draaien gebruiken een in-memory
+  `ModelContainer` (`ModelConfiguration(isStoredInMemoryOnly: true)`) op basis
+  van `AppSchema.models` — nooit de productie-store.
 - Geen UI-tests in de CI-pipeline (te traag / bros). Wel snapshots achter een
   aparte scheme mogen, maar niet vereist.
 
