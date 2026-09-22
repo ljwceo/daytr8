@@ -357,15 +357,92 @@ Nieuwe tests (`TradeJournalTests/`)
 - [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
       GitHub Actions-build; niet in deze sessie uitgevoerd).
 
-## Volgende fase — Fase 4: Rapporten en analyse
+## Fase 4 — Rapporten en analyse ✅
 
-Vooruitkijkend op basis van `SPEC.md §7`:
+Doel: `SPEC.md §7` werkend krijgen bovenop de filters/statistiek-services uit
+fase 1 en 3: brede breakdown-rapportages (confluence, confluentiecombinaties,
+playbook, symbool, richting, sessie, dag van de week, uur van de dag,
+trade-duur, tag, mistake, emotie, rating), elk filterbaar, plus een
+vergelijkingsmodus met twee filtersets naast elkaar.
 
-- Tabbladen met tabellen + grafieken, filterbaar: per confluence, per
-  combinatie van confluences (gerangschikt op expectancy), per playbook,
-  per symbool, per richting, per sessie, per dag van de week, per uur van de
-  dag, per trade-duur, per tag, per mistake.
-- Emotie vs. resultaat, rating vs. resultaat.
-- Vergelijkingsmodus: twee filtersets naast elkaar.
-- Herbruikt `StatsService`/`DashboardViewModel`-filters waar mogelijk; nieuwe
-  aggregatie-service voor "groeperen op X" hoort in `Services/`.
+### Aangemaakte / gewijzigde bestanden
+
+Nieuwe service (`TradeJournal/Services/`)
+- `ReportAggregationService.swift` — puur, geen SwiftData-mutaties. Eén
+  generieke `group(_:keys:)`-helper (O(n) per dimensie) waar alle
+  breakdown-methodes op leunen: `byConfluence`, `byConfluenceCombination`
+  (paren van confluences die samen op een trade staan, gerangschikt op
+  expectancy, gefilterd op `minTradeCount` om ruis eruit te halen),
+  `byPlaybook`, `bySymbol`, `byDirection`, `bySession`, `byDayOfWeek`
+  (maandag→zondag, los van `calendar.firstWeekday`), `byHourOfDay`,
+  `byDuration` (buckets via `TradeDurationBucket`: <5 min t/m >4 uur, open
+  trades tellen niet mee), `byTag`, `byMistake` (netto P&L per fout = wat de
+  fout kost), `byEmotionBefore`/`byEmotionAfter` en `byRating` (1–5 sterren,
+  ongewaardeerde trades tellen niet mee). Levert overal `GroupResult`
+  (label, `TradeStatistics`, optionele kleur) terug.
+
+Nieuwe viewmodel (`TradeJournal/ViewModels/`)
+- `ReportsViewModel.swift` — `Tab`-enum voor de 14 breakdown-dimensies
+  (met `isUserSortable`: dag/uur/duur/rating/combinaties hebben al een
+  betekenisvolle volgorde en zijn niet door de gebruiker te sorteren),
+  `SortKey` (netto P&L/win rate/aantal/expectancy/gem. R) +
+  oplopend/aflopend. Hergebruikt bewust twee `DashboardViewModel`-instanties
+  (`primaryFilter`/`secondaryFilter`) voor de filters én voor
+  `DashboardFilterBar` als filter-UI in plaats van een eigen filter-stack te
+  bouwen — zo blijft er precies één plek die trades filtert. `compareMode`
+  schakelt tussen één en twee filtersets.
+
+Nieuwe/gewijzigde views (`TradeJournal/Views/Reports/`)
+- `ReportsView.swift` (was placeholder) — filterbalk (`DashboardFilterBar`,
+  dubbel in vergelijkingsmodus), horizontale tabbladkiezer, per tabblad een
+  staafdiagram + tabel; toolbar-knop schakelt vergelijkingsmodus (twee
+  filtersets naast elkaar met eigen KPI-samenvatting en dubbele
+  resultatentabel) aan/uit. Sorteermenu alleen zichtbaar voor sorteerbare
+  tabbladen.
+- `GroupResultRowView.swift` — rij met label(+kleurstip), aantal trades,
+  win rate, netto P&L en gem. R; gebruikt in de enkele en dubbele
+  (vergelijkings-)lijst.
+- `GroupedBarChartView.swift` — horizontale staafdiagram van netto P&L per
+  groep (Swift Charts `BarMark`), begrensd tot de eerste `maxBars` groepen.
+
+Nieuwe tests (`TradeJournalTests/`)
+- `ReportAggregationServiceTests.swift` — elke breakdown-dimensie
+  afzonderlijk: groepering, uitsluiten van trades zonder waarde (geen
+  playbook/confluences/emotie/rating/open trade), sortering/volgorde
+  (maandag→zondag, uur oplopend, duur-buckets, rating oplopend,
+  confluentiecombinaties op expectancy + `minTradeCount`-filter), en dat
+  `byMistake` de kosten van een fout laat zien.
+- `ReportsViewModelTests.swift` — primaire/secundaire filterset werken
+  onafhankelijk, `groupResults` dispatcht naar de juiste service-methode,
+  confluentiecombinaties negeren de sorteerinstellingen, sortering op
+  netto P&L op- en aflopend, `isUserSortable` per tabblad.
+
+### Definition of done voor fase 4
+
+- [x] Tabbladen per confluence, confluentiecombinatie (op expectancy),
+      playbook, symbool, richting, sessie, dag van de week, uur van de dag,
+      trade-duur, tag en mistake — elk met tabel + staafdiagram, filterbaar.
+- [x] Emotie (vooraf/achteraf) vs. resultaat, rating vs. resultaat.
+- [x] Vergelijkingsmodus: twee filtersets naast elkaar.
+- [x] Hergebruikt `StatsService`/`DashboardViewModel`-filters en
+      `DashboardFilterBar`; nieuwe aggregatie-service in `Services/`.
+- [x] Unit tests voor alle breakdown-dimensies en de viewmodel.
+- [x] `PROGRESS.md` bijgewerkt.
+- [ ] Groene CI-run bevestigen op deze branch (kan pas na een Mac-lokale of
+      GitHub Actions-build; niet in deze sessie uitgevoerd).
+
+## Volgende fase — Fase 5: Import en export
+
+Vooruitkijkend op basis van `SPEC.md §9`:
+
+- CSV-import met kolommapping-scherm (zelf kolommen koppelen), presets voor
+  Tradovate, NinjaTrader, TopstepX/ProjectX, MetaTrader, TradingView. Losse
+  fills automatisch samenvoegen tot trades (`TradeExecution`). Duplicaten
+  detecteren.
+- Volledige backup-export naar `.zip` (JSON + screenshots) via de iOS share
+  sheet / Bestanden-app, en volledige restore vanuit zo'n backup. Versienummer
+  in de payload voor toekomstige migraties.
+- Optionele automatische backup naar een gekozen map in Bestanden
+  (security-scoped bookmark).
+- CSV-export van trades.
+- Waarschuwing in de app als de laatste backup ouder is dan 7 dagen.
