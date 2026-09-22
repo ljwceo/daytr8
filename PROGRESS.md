@@ -159,7 +159,7 @@ Nieuwe test-target (`TradeJournalTests/`)
       via de Meer-tab.
 - [x] Unit tests voor alle berekeningen en de seed/sample-data services.
 - [x] `PROGRESS.md` en `CLAUDE.md` bijgewerkt.
-- [ ] Groene CI-run — bevestigen zodra de branch gepusht is.
+- [x] Groene CI-run bevestigd (workflow_dispatch op deze branch).
 
 ## Volgende fase — Fase 2: Trade log & tradeformulier
 
