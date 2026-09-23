@@ -127,8 +127,8 @@ final class TradesListViewModelTests: XCTestCase {
 
     func test_sortOption_dateAscending_ordersOldestFirst() {
         let viewModel = TradesListViewModel()
-        let older = makeTrade(entryDate: Date(timeIntervalSince1970: 1_000), exit: nil, exitDate: nil)
-        let newer = makeTrade(entryDate: Date(timeIntervalSince1970: 2_000), exit: nil, exitDate: nil)
+        let older = makeTrade(exit: nil, entryDate: Date(timeIntervalSince1970: 1_000), exitDate: nil)
+        let newer = makeTrade(exit: nil, entryDate: Date(timeIntervalSince1970: 2_000), exitDate: nil)
 
         viewModel.sortOption = .dateAscending
         let result = viewModel.filteredAndSorted([newer, older])
