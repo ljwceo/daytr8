@@ -144,29 +144,34 @@ struct TradeDetailView: View {
 
     private var priceCard: some View {
         card(title: "Prijzen & risk") {
-            infoRow("Entry-prijs", String(format: "%.5g", trade.entryPrice))
+            infoRow("Entry-prijs", Self.number(trade.entryPrice))
             if let exit = trade.exitPrice {
-                infoRow("Exit-prijs", String(format: "%.5g", exit))
+                infoRow("Exit-prijs", Self.number(exit))
             }
-            infoRow("Aantal", String(format: "%.4g", trade.quantity))
+            infoRow("Aantal", Self.number(trade.quantity))
             if let stop = trade.stopLoss {
-                infoRow("Stop loss", String(format: "%.5g", stop))
+                infoRow("Stop loss", Self.number(stop))
             }
             if let target = trade.takeProfit {
-                infoRow("Take profit", String(format: "%.5g", target))
+                infoRow("Take profit", Self.number(target))
             }
             if let risk = metrics.riskAmount {
                 infoRow("Geplande risk", risk.formatted(.currency(code: currency)))
             }
             if let mae = trade.mae {
-                infoRow("MAE", String(format: "%.5g", mae))
+                infoRow("MAE", Self.number(mae))
             }
             if let mfe = trade.mfe {
-                infoRow("MFE", String(format: "%.5g", mfe))
+                infoRow("MFE", Self.number(mfe))
             }
             infoRow("Commissie", trade.commission.formatted(.currency(code: currency)))
             infoRow("Fees", trade.fees.formatted(.currency(code: currency)))
         }
+    }
+
+    /// Prijzen en aantallen volledig (27371.55, niet afgerond tot 27372).
+    private static func number(_ value: Double) -> String {
+        value == 0 ? "0" : DecimalInput.format(value)
     }
 
     private var confluencesCard: some View {
