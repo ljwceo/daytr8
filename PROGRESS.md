@@ -703,10 +703,117 @@ Tests (`TradeJournalTests/`)
 - Meegenomen: fix in `FillAggregatorTests` (defaulted `symbol`-parameter van de
   `fill`-helper naar het einde verplaatst).
 
-## Volgende fase — Fase 7: Screenshot import (OCR)
+## Fase 7 — Screenshot import (OCR) ✅
 
-Op basis van `SPEC.md §12`: "Vul in vanuit screenshot" in het tradeformulier
-met Vision-OCR (`VNRecognizeTextRequest`), `ScreenshotParser` met
-broker-templates als JSON-resources, "uit OCR"-markeringen en alternatieven
-per veld, screenshot automatisch als bijlage, en parser-tests met
-tekstfixtures per broker.
+Doel: `SPEC.md §12` — "Vul in vanuit screenshot" in het tradeformulier: een
+broker-screenshot uit Foto's of de camera wordt on-device gelezen (Apple Vision,
+`VNRecognizeTextRequest`, geen netwerk, geen dependencies) en zoveel mogelijk
+velden worden ingevuld.
+
+Afgestemd vóór de bouw: de instellingen tonen alleen een **lijst** van de
+meegeleverde templates; eigen templates aanmaken/bewerken is een vervolgfase
+(geen wijziging aan SwiftData-schema of backupformaat in deze fase).
+
+### Aangemaakte / gewijzigde bestanden
+
+Modellen (`TradeJournal/Models/`)
+- `ScreenshotTemplate.swift` — `ScreenshotField` (herkenbare velden incl.
+  koop-/verkoopkant, veldgroepen) en het `Codable` template-formaat
+  (`formatVersion`, `keywords`, `priority`, `isFallback`, `dateOrder`, per veld
+  `patterns` + optioneel `group` en `postProcess`).
+- `ScreenshotParseResult.swift` — `ParsedField<T>` (waarde, alternatieven,
+  bron-template, `isDerived`) en het parse-resultaat.
+
+Services (`TradeJournal/Services/`)
+- `ScreenshotParser.swift` — puur op tekst: platform herkennen via keywords,
+  regexen per veld, generieke terugval (niet voor velden uit een groep die het
+  platform-template zelf definieert, bijv. bruto/netto P&L), symbool-heuristiek
+  tegen bekende instrumenten, koop-/verkoopkant → richting + entry/exit,
+  tijden zonder datum op de dag van de trade. Hergebruikt `ImportValueParser`
+  (getallen, datums, richting, symboolnormalisatie).
+- `ScreenshotTemplateStore.swift` — laadt `Resources/ScreenshotTemplates/*.json`,
+  slaat ongeldige/nieuwere formaten over.
+- `ScreenshotTextRecognizer.swift` — `ScreenshotTextRecognizing`-protocol,
+  `VisionTextRecognizer` (accurate, zonder taalcorrectie, EXIF-oriëntatie) en
+  `ScreenshotLineBuilder` (Vision-blokken op dezelfde hoogte → één regel).
+- `StatsService.swift` — `exitPrice(forGrossPnL:…)` en `quantity(forGrossPnL:…)`
+  om ontbrekende exit of aantal uit de P&L te berekenen met tick size/value.
+
+Resources (`TradeJournal/Resources/ScreenshotTemplates/`)
+- `tradovate.json`, `topstepx.json`, `ninjatrader.json`, `metatrader.json`,
+  `tradingview.json` en `default.json` (generieke terugval).
+
+Viewmodel
+- `TradeFormViewModel.swift` — `importScreenshot(_:instruments:)` (screenshot
+  altijd als bijlage, OCR, parse, invullen), `applyScreenshotResult`, symbool
+  tegen de eigen instrumenttabel en presets (tick size/value), afleiden van
+  exit/aantal/commissie, snel-invoer als er alleen een resultaat is,
+  `ocrOrigins` (herkend/berekend), `ocrCandidates`/`selectOCRCandidate`,
+  meldingen. Herkenner en templates zijn injecteerbaar voor tests.
+
+Views
+- `Views/Trades/TradeFormView.swift` — knop "Vul in vanuit screenshot" (Foto's
+  of camera), voortgang en melding, `sparkles`-icoon (uit OCR) of `function`
+  (berekend) per veld, chip-rij met alternatieven.
+- `Views/Components/CameraPickerView.swift` — camera via `UIImagePickerController`.
+- `Views/More/ScreenshotTemplatesView.swift` + link in `MoreView` (Instellingen):
+  alleen-lezen overzicht van templates, keywords en regexen.
+
+Project
+- `project.yml` — `Resources/ScreenshotTemplates` als folder reference
+  (resources-fase), zodat nieuwe `.json`'s vanzelf meekomen.
+- `Info.plist` + `project.yml` — `NSPhotoLibraryUsageDescription` en
+  `NSCameraUsageDescription` vermelden nu ook het (on-device) uitlezen.
+
+Tests (`TradeJournalTests/`)
+- `ScreenshotParserTests.swift` — tekstfixtures per template (Tradovate long en
+  short, TopstepX, NinjaTrader, MetaTrader, TradingView), generieke layouts,
+  alternatieven, niets herkend, platformherkenning, tijden zonder datum, een
+  nieuw template uit JSON zonder codewijziging, formaatversie, ongeldige regex,
+  regelopbouw uit Vision-blokken.
+- `TradeFormScreenshotImportTests.swift` — import met nep-herkenner, OCR-fout en
+  niets herkend (screenshot wel bijgevoegd), eigen instrument, afleiden via
+  tick size/value, snel-invoer, alternatieven kiezen, `StatsService`-helpers.
+- Niet lokaal gedraaid (geen Xcode in de bouwomgeving); de regexen zijn tegen
+  dezelfde fixtures gecontroleerd met een Python-simulatie van de parser.
+
+### Definition of done voor fase 7
+
+- [x] Knop "Vul in vanuit screenshot" in het tradeformulier (Foto's of camera).
+- [x] On-device OCR met `VNRecognizeTextRequest`; geen netwerk, geen dependencies.
+- [x] `ScreenshotParser` herkent Tradovate, TopstepX, NinjaTrader, MetaTrader en
+      TradingView via keywords, met generieke terugval voor onbekende layouts.
+- [x] Broker-templates als JSON in `Resources/ScreenshotTemplates/`; nieuw
+      platform = nieuw bestand, zonder Swift-code.
+- [x] Velden: symbool, richting, entry, exit, SL, TP, aantal, bruto/netto P&L,
+      entry-/exit-tijd, commissie/fees.
+- [x] Symbool tegen de instrumenttabel/presets; tick size/value gebruikt om een
+      ontbrekende exit of aantal uit de P&L te berekenen (R volgt dan uit de SL).
+- [x] "Uit OCR"-icoon per ingevuld veld, chip-rij bij meerdere kandidaten.
+- [x] Screenshot automatisch als bijlage; bij falen of niets herkend blijft het
+      formulier leeg met alleen de screenshot en een nette melding.
+- [x] Instellingen tonen de lijst met beschikbare templates.
+- [x] Parser-tests met tekstfixtures per template.
+- [ ] Groene `test`-job in CI — hangt af van de bestaande test-compileerfouten
+      uit fase 5/6 (aparte batch); de IPA-build is niet van de tests afhankelijk.
+
+### Openstaande punten
+
+- Eigen templates aanmaken/bewerken in de app (rest van SPEC.md §12) — vraagt
+  om opslag (bestanden of SwiftData) en een backupformaat-uitbreiding.
+- De templates zijn gemaakt op basis van bekende labels van de platforms, niet
+  op echte screenshots; na testen op toestel waarschijnlijk regexen bijstellen.
+- Tabelweergaven (kolomkoppen op één regel, waarden op de volgende) worden niet
+  herkend; alleen label-waarde-layouts (detail-/ticketpanelen).
+- Vision draait met `en-US`; Nederlandse labels werken via eigen regexen, maar
+  zonder taalmodel.
+- `README.md` beschrijft nog de status van fase 2.
+- Test-compileerfouten uit fase 5/6 opruimen en daarna de test-gate in CI
+  terugzetten (zie hierboven).
+
+## Volgende fase
+
+SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
+screenshot-templates na. Voorstel voor de volgende stappen: (1) de
+test-compileerfouten opruimen en de CI-test-gate terugzetten, (2) een
+template-editor voor eigen screenshot-templates.
