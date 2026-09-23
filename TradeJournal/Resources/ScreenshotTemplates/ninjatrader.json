@@ -74,5 +74,74 @@
         "absolute"
       ]
     }
+  },
+  "columns": {
+    "symbol": {
+      "labels": [
+        "instrument"
+      ]
+    },
+    "direction": {
+      "labels": [
+        "market pos.",
+        "market pos",
+        "market position"
+      ]
+    },
+    "quantity": {
+      "labels": [
+        "qty",
+        "quantity"
+      ]
+    },
+    "entry_price": {
+      "labels": [
+        "entry price"
+      ]
+    },
+    "exit_price": {
+      "labels": [
+        "exit price"
+      ]
+    },
+    "entry_time": {
+      "labels": [
+        "entry time"
+      ]
+    },
+    "exit_time": {
+      "labels": [
+        "exit time"
+      ]
+    },
+    "gross_pnl": {
+      "labels": [
+        "profit"
+      ]
+    },
+    "commission": {
+      "labels": [
+        "commission"
+      ],
+      "postProcess": [
+        "absolute"
+      ]
+    },
+    "other": {
+      "labels": [
+        "trade number",
+        "trade #",
+        "account",
+        "strategy",
+        "entry name",
+        "exit name",
+        "cum. net profit",
+        "cum net profit",
+        "mae",
+        "mfe",
+        "etd",
+        "bars"
+      ]
+    }
   }
 }

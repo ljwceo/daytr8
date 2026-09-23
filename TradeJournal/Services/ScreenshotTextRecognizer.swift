@@ -3,12 +3,23 @@ import CoreGraphics
 import ImageIO
 import Vision
 
-/// Leest tekstregels uit een afbeelding. Protocol zodat het tradeformulier
-/// in tests een nep-herkenner kan krijgen.
+/// Leest tekst uit een afbeelding. Protocol zodat het tradeformulier in
+/// tests een nep-herkenner kan krijgen.
 public protocol ScreenshotTextRecognizing: Sendable {
     /// Tekstregels van boven naar beneden; woorden op dezelfde hoogte staan
     /// op één regel (van links naar rechts).
     func recognizeLines(in imageData: Data) async throws -> [String]
+    /// Tekstblokken mét positie, nodig om tabellen (kolomkoppen met waarden
+    /// eronder) te lezen.
+    func recognizeBoxes(in imageData: Data) async throws -> [RecognizedTextBox]
+}
+
+extension ScreenshotTextRecognizing {
+    /// Zonder echte posities: elke regel wordt één blok, met de tekens als
+    /// vaste breedte (zie `ScreenshotLineBuilder.boxes(fromLines:)`).
+    public func recognizeBoxes(in imageData: Data) async throws -> [RecognizedTextBox] {
+        ScreenshotLineBuilder.boxes(fromLines: try await recognizeLines(in: imageData))
+    }
 }
 
 public enum ScreenshotOCRError: Error, Equatable {
@@ -22,6 +33,10 @@ public struct VisionTextRecognizer: ScreenshotTextRecognizing {
     public init() {}
 
     public func recognizeLines(in imageData: Data) async throws -> [String] {
+        ScreenshotLineBuilder.lines(from: try await recognizeBoxes(in: imageData))
+    }
+
+    public func recognizeBoxes(in imageData: Data) async throws -> [RecognizedTextBox] {
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw ScreenshotOCRError.unreadableImage
@@ -35,7 +50,7 @@ public struct VisionTextRecognizer: ScreenshotTextRecognizing {
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let boxes = try Self.recognize(image, orientation: orientation)
-                    continuation.resume(returning: ScreenshotLineBuilder.lines(from: boxes))
+                    continuation.resume(returning: boxes)
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -83,6 +98,15 @@ public enum ScreenshotLineBuilder {
     public static let columnSeparator = "  "
 
     public static func lines(from boxes: [RecognizedTextBox]) -> [String] {
+        rows(from: boxes).map { row in
+            row.map { $0.text.trimmingCharacters(in: .whitespaces) }
+                .joined(separator: columnSeparator)
+        }
+    }
+
+    /// Blokken per regel: regels van boven naar beneden, blokken binnen een
+    /// regel van links naar rechts. Lege blokken vallen weg.
+    public static func rows(from boxes: [RecognizedTextBox]) -> [[RecognizedTextBox]] {
         let sorted = boxes
             .filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
             .sorted { $0.boundingBox.midY > $1.boundingBox.midY }
@@ -99,8 +123,26 @@ public enum ScreenshotLineBuilder {
 
         return rows.map { row in
             row.sorted { $0.boundingBox.minX < $1.boundingBox.minX }
-                .map { $0.text.trimmingCharacters(in: .whitespaces) }
-                .joined(separator: columnSeparator)
+        }
+    }
+
+    /// Nep-blokken voor tekst zonder posities (tests, of een herkenner die
+    /// alleen regels levert): één blok per regel, bovenaan eerst, met elk
+    /// teken even breed. Kolommen die in de tekst onder elkaar staan, staan
+    /// daardoor ook in de blokken onder elkaar.
+    public static func boxes(fromLines lines: [String]) -> [RecognizedTextBox] {
+        let longest = CGFloat(max(lines.map(\.count).max() ?? 1, 1))
+        let step = 1 / CGFloat(lines.count + 1)
+        return lines.enumerated().map { index, line in
+            RecognizedTextBox(
+                text: line,
+                boundingBox: CGRect(
+                    x: 0,
+                    y: 1 - CGFloat(index + 1) * step - step * 0.4,
+                    width: CGFloat(max(line.count, 1)) / longest,
+                    height: step * 0.8
+                )
+            )
         }
     }
 }

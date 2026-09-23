@@ -77,6 +77,10 @@ public final class TradeFormViewModel {
     public private(set) var ocrOrigins: [ScreenshotField: OCRFieldOrigin] = [:]
     /// Laatste parse-resultaat (bron van de alternatieven).
     public private(set) var ocrResult: ScreenshotParseResult?
+    /// Tabel met meerdere trades op de screenshot: elke rij, om per trade te
+    /// kiezen (zo raken waarden van verschillende trades niet door elkaar).
+    public private(set) var ocrTrades: [ScreenshotParseResult] = []
+    public private(set) var selectedOCRTradeIndex: Int?
     /// Melding na een import (succes, niets gevonden of fout).
     public var ocrMessage: String?
     public private(set) var isRecognizingScreenshot = false
@@ -312,14 +316,16 @@ public final class TradeFormViewModel {
         isRecognizingScreenshot = true
         defer { isRecognizingScreenshot = false }
         do {
-            let lines = try await textRecognizer.recognizeLines(in: data)
+            let boxes = try await textRecognizer.recognizeBoxes(in: data)
             let parser = ScreenshotParser(
                 templates: screenshotTemplates,
                 knownSymbols: CSVImportService.knownSymbols(instruments: instruments)
             )
-            applyScreenshotResult(parser.parse(lines: lines, referenceDate: values.entryDate), instruments: instruments)
+            applyScreenshotResult(parser.parse(boxes: boxes, referenceDate: values.entryDate), instruments: instruments)
         } catch {
             ocrResult = nil
+            ocrTrades = []
+            selectedOCRTradeIndex = nil
             ocrOrigins = [:]
             ocrMessage = "De tekst op de screenshot kon niet gelezen worden. De screenshot is wel als bijlage toegevoegd; vul de trade handmatig in."
         }
@@ -328,7 +334,51 @@ public final class TradeFormViewModel {
     /// Vult het formulier met een parse-resultaat. Alleen gevonden velden
     /// worden overschreven; ontbrekende exit-prijs of aantal worden, als de
     /// tick-specificatie van het instrument bekend is, uit de P&L berekend.
+    /// Staan er meerdere trades in een tabel, dan wordt de eerste ingevuld en
+    /// zijn de andere te kiezen met `selectOCRTrade(_:)`.
     public func applyScreenshotResult(_ result: ScreenshotParseResult, instruments: [Instrument]) {
+        ocrTrades = result.tableRows
+        selectedOCRTradeIndex = result.tableRows.isEmpty ? nil : 0
+        applyParsedTrade(result, instruments: instruments)
+    }
+
+    /// Kiest een andere trade uit de tabel op de screenshot.
+    public func selectOCRTrade(_ index: Int) {
+        guard ocrTrades.indices.contains(index) else { return }
+        applyParsedTrade(ocrTrades[index], instruments: ocrInstruments)
+        selectedOCRTradeIndex = index
+    }
+
+    /// Keuzes voor de trade-rij; leeg als de screenshot maar één trade toont.
+    public var ocrTradeCandidates: [OCRCandidate] {
+        guard ocrTrades.count > 1 else { return [] }
+        return ocrTrades.enumerated().map { index, trade in
+            OCRCandidate(id: index, label: Self.tradeLabel(trade), isSelected: index == selectedOCRTradeIndex)
+        }
+    }
+
+    /// "MNQ · Long · 21450.25 → 21462.75 · +50" voor de keuze tussen trades.
+    private static func tradeLabel(_ trade: ScreenshotParseResult) -> String {
+        var parts: [String] = []
+        if let symbol = trade.symbol?.value { parts.append(symbol) }
+        if let direction = trade.direction?.value { parts.append(direction.displayName) }
+        if let entry = trade.entryPrice?.value {
+            if let exit = trade.exitPrice?.value {
+                parts.append("\(numberLabel(entry)) → \(numberLabel(exit))")
+            } else {
+                parts.append(numberLabel(entry))
+            }
+        }
+        if let pnl = (trade.netPnL ?? trade.grossPnL)?.value {
+            parts.append((pnl > 0 ? "+" : "") + numberLabel(pnl))
+        }
+        if let time = (trade.entryTime ?? trade.exitTime)?.value {
+            parts.append(time.formatted(date: .omitted, time: .shortened))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func applyParsedTrade(_ result: ScreenshotParseResult, instruments: [Instrument]) {
         ocrResult = result
         ocrInstruments = instruments
         ocrOrigins = [:]
@@ -397,7 +447,9 @@ public final class TradeFormViewModel {
 
         let count = ocrOrigins.count
         let fieldsText = count == 1 ? "1 veld" : "\(count) velden"
-        if let name = result.templateName {
+        if let name = result.templateName, ocrTrades.count > 1 {
+            ocrMessage = "Herkend als \(name): \(ocrTrades.count) trades op de screenshot. Kies hieronder de juiste trade en controleer de gemarkeerde velden."
+        } else if let name = result.templateName {
             ocrMessage = "Herkend als \(name): \(fieldsText) ingevuld. Controleer de gemarkeerde velden."
         } else {
             ocrMessage = "Geen bekend platform herkend; met generieke herkenning \(fieldsText) ingevuld. Controleer de gemarkeerde velden."

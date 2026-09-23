@@ -161,6 +161,34 @@ final class ScreenshotParserTests: XCTestCase {
         Close Time  2025-09-22 09:48:01
         """
 
+        /// Tradovate Reports → Performance: tabel, één rij per trade (kolommen volgens de documentatie, geen echte screenshot).
+        static let tradovatePerformanceTable = """
+        Tradovate
+        Performance
+        Symbol  Qty  Buy Price  Sell Price  P&L      Bought Timestamp     Sold Timestamp       Duration
+        MNQZ5   2    21450.25   21462.75    $50.00   09/22/2025 09:31:22  09/22/2025 09:45:10  13min 48sec
+        ESZ5    1    6650.50    6655.00     $225.00  09/22/2025 10:12:40  09/22/2025 10:02:05  10min 35sec
+        MNQZ5   1    21470.00   21465.50    $(9.00)  09/22/2025 11:00:01  09/22/2025 11:03:30  3min 29sec
+        """
+
+        /// TopstepX Trades: tabel met Symbol, Size, Type, tijden, prijzen, P&L en Fees (volgens de documentatie).
+        static let topstepXTradesTable = """
+        TopstepX
+        Trades
+        Symbol  Size  Type   Entry Time           Exit Time            Entry Price  Exit Price  P&L      Fees
+        /MNQ    3     Long   09/22/2025 09:31:22  09/22/2025 09:40:05  21450.25     21440.00    -$61.50  $2.22
+        /ES     1     Short  09/22/2025 10:05:00  09/22/2025 10:20:45  6655.00      6650.50     $225.00  $2.80
+        """
+
+        /// NinjaTrader 8 Trade Performance → Trades: tabel met de standaardkolommen (volgens de documentatie).
+        static let ninjaTraderTradesTable = """
+        Trade Performance
+        Trades
+        Trade number  Instrument  Account  Strategy  Market pos.  Qty  Entry price  Exit price  Entry time             Exit time              Entry name  Exit name      Profit     Cum. net profit  Commission  MAE      MFE      ETD      Bars
+        1             NQ 12-25    Sim101             Long         1    21450.25     21470.50    9/22/2025 9:31:22 AM   9/22/2025 9:52:10 AM   Entry       Profit target  $405.00    $400.70          $4.30       $75.00   $450.00  $45.00   21
+        2             NQ 12-25    Sim101             Short        2    21480.00     21490.25    9/22/2025 10:15:00 AM  9/22/2025 10:21:40 AM  Entry       Stop loss      ($410.00)  ($18.60)         $8.60       $450.00  $120.00  $530.00  7
+        """
+
         /// Onbekend platform: alleen het generieke template.
         static let unknownLayout = """
         Trade summary
@@ -391,6 +419,126 @@ final class ScreenshotParserTests: XCTestCase {
         XCTAssertEqual(result.commission?.value, 0)
         XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22))
         XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 9, 48, 1))
+    }
+
+    // MARK: - Tabellen
+
+    func test_tradovate_performanceTable_rowsBecomeTrades() {
+        let result = makeParser().parse(Fixture.tradovatePerformanceTable)
+
+        XCTAssertEqual(result.templateID, "tradovate")
+        XCTAssertEqual(result.symbol?.value, "MNQ", "MNQZ5 → MNQ")
+        XCTAssertEqual(result.direction?.value, .long, "Eerst gekocht")
+        XCTAssertEqual(result.quantity?.value, 2)
+        XCTAssertEqual(result.entryPrice?.value, 21450.25)
+        XCTAssertEqual(result.exitPrice?.value, 21462.75)
+        XCTAssertEqual(result.grossPnL?.value, 50)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22))
+        XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 9, 45, 10))
+        XCTAssertEqual(result.entryPrice?.alternatives, [], "Andere trades via tableRows, niet per veld")
+
+        XCTAssertEqual(result.tableRows.count, 3)
+        var firstRow = result
+        firstRow.tableRows = []
+        XCTAssertEqual(result.tableRows[0], firstRow, "Eerste rij = het voorstel")
+        let second = result.tableRows[1]
+        XCTAssertEqual(second.symbol?.value, "ES")
+        XCTAssertEqual(second.direction?.value, .short, "Eerst verkocht")
+        XCTAssertEqual(second.entryPrice?.value, 6655)
+        XCTAssertEqual(second.exitPrice?.value, 6650.5)
+        XCTAssertEqual(second.grossPnL?.value, 225)
+        XCTAssertEqual(result.tableRows[2].grossPnL?.value, -9, "$(9.00) is negatief")
+    }
+
+    func test_topstepX_tradesTable() {
+        let result = makeParser().parse(Fixture.topstepXTradesTable)
+
+        XCTAssertEqual(result.templateID, "topstepx")
+        XCTAssertEqual(result.symbol?.value, "MNQ")
+        XCTAssertEqual(result.direction?.value, .long)
+        XCTAssertEqual(result.quantity?.value, 3)
+        XCTAssertEqual(result.entryPrice?.value, 21450.25)
+        XCTAssertEqual(result.exitPrice?.value, 21440)
+        XCTAssertEqual(result.grossPnL?.value, -61.5)
+        XCTAssertEqual(result.fees?.value, 2.22)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22))
+        XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 9, 40, 5))
+
+        XCTAssertEqual(result.tableRows.count, 2)
+        XCTAssertEqual(result.tableRows[1].symbol?.value, "ES")
+        XCTAssertEqual(result.tableRows[1].direction?.value, .short)
+        XCTAssertEqual(result.tableRows[1].grossPnL?.value, 225)
+    }
+
+    /// Zonder "TopstepX" in beeld: de kolomkoppen zelf wijzen het platform aan.
+    func test_topstepX_tradesTable_recognizedByHeadersAlone() {
+        let text = Fixture.topstepXTradesTable
+            .components(separatedBy: "\n")
+            .filter { $0 != "TopstepX" }
+            .joined(separator: "\n")
+        let result = makeParser().parse(text)
+
+        XCTAssertEqual(result.templateID, "topstepx")
+        XCTAssertEqual(result.entryPrice?.value, 21450.25)
+    }
+
+    func test_ninjaTrader_tradesTable() {
+        let result = makeParser().parse(Fixture.ninjaTraderTradesTable)
+
+        XCTAssertEqual(result.templateID, "ninjatrader")
+        XCTAssertEqual(result.symbol?.value, "NQ", "NQ 12-25 → NQ")
+        XCTAssertEqual(result.direction?.value, .long)
+        XCTAssertEqual(result.quantity?.value, 1)
+        XCTAssertEqual(result.entryPrice?.value, 21450.25)
+        XCTAssertEqual(result.exitPrice?.value, 21470.5)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22), "Tijd breder dan de kop blijft heel")
+        XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 9, 52, 10))
+        XCTAssertEqual(result.grossPnL?.value, 405, "Profit, niet Cum. net profit")
+        XCTAssertEqual(result.commission?.value, 4.3)
+        XCTAssertNil(result.stopLoss, "\"Stop loss\" als exit name is geen stop")
+
+        XCTAssertEqual(result.tableRows.count, 2)
+        let second = result.tableRows[1]
+        XCTAssertEqual(second.direction?.value, .short)
+        XCTAssertEqual(second.quantity?.value, 2)
+        XCTAssertEqual(second.grossPnL?.value, -410)
+        XCTAssertEqual(second.commission?.value, 8.6)
+        XCTAssertEqual(second.entryTime?.value, utcDate(2025, 9, 22, 10, 15, 0))
+    }
+
+    /// Zoals Vision het levert: losse blokken per cel met echte posities
+    /// (proportioneel lettertype), twee koppen samengevoegd in één blok en
+    /// een tijd die breder is dan zijn kop.
+    func test_table_fromVisionBoxes() {
+        func box(_ text: String, _ x: CGFloat, _ width: CGFloat, row: Int) -> RecognizedTextBox {
+            RecognizedTextBox(text: text, boundingBox: CGRect(x: x, y: 0.9 - CGFloat(row) * 0.05, width: width, height: 0.02))
+        }
+        let boxes = [
+            box("Tradovate", 0.02, 0.15, row: 0),
+            box("Symbol", 0.02, 0.07, row: 1), box("Qty", 0.12, 0.03, row: 1),
+            box("Buy Price Sell Price", 0.18, 0.22, row: 1), box("P&L", 0.44, 0.03, row: 1),
+            box("Bought Timestamp", 0.52, 0.14, row: 1), box("Sold Timestamp", 0.74, 0.13, row: 1),
+            box("MNQZ5", 0.02, 0.06, row: 2), box("2", 0.12, 0.01, row: 2),
+            box("21,450.25", 0.18, 0.08, row: 2), box("21,462.75", 0.30, 0.08, row: 2),
+            box("$50.00", 0.44, 0.05, row: 2),
+            box("09/22/2025 09:31:22", 0.52, 0.17, row: 2), box("09/22/2025 09:45:10", 0.74, 0.17, row: 2)
+        ]
+        let result = makeParser().parse(boxes: boxes)
+
+        XCTAssertEqual(result.templateID, "tradovate")
+        XCTAssertEqual(result.symbol?.value, "MNQ")
+        XCTAssertEqual(result.quantity?.value, 2)
+        XCTAssertEqual(result.entryPrice?.value, 21450.25)
+        XCTAssertEqual(result.exitPrice?.value, 21462.75)
+        XCTAssertEqual(result.grossPnL?.value, 50)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22))
+        XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 9, 45, 10))
+        XCTAssertEqual(result.tableRows, [], "Eén trade: geen keuze nodig")
+    }
+
+    func test_bundledTemplates_haveTableColumns() {
+        let ids = Set(templates.filter { $0.columns?.isEmpty == false }.map(\.id))
+        XCTAssertEqual(ids, ["tradovate", "topstepx", "ninjatrader"])
     }
 
     // MARK: - Generieke terugval

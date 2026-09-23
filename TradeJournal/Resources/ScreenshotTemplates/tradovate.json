@@ -62,5 +62,72 @@
         "absolute"
       ]
     }
+  },
+  "columns": {
+    "symbol": {
+      "labels": [
+        "symbol",
+        "contract"
+      ]
+    },
+    "quantity": {
+      "labels": [
+        "paired qty",
+        "qty",
+        "quantity"
+      ]
+    },
+    "buy_price": {
+      "labels": [
+        "buy price",
+        "avg buy price",
+        "avg. buy price"
+      ]
+    },
+    "sell_price": {
+      "labels": [
+        "sell price",
+        "avg sell price",
+        "avg. sell price"
+      ]
+    },
+    "gross_pnl": {
+      "labels": [
+        "p&l",
+        "pnl",
+        "p/l"
+      ]
+    },
+    "buy_time": {
+      "labels": [
+        "bought timestamp",
+        "bought time",
+        "bought"
+      ]
+    },
+    "sell_time": {
+      "labels": [
+        "sold timestamp",
+        "sold time",
+        "sold"
+      ]
+    },
+    "commission": {
+      "labels": [
+        "commission",
+        "commissions"
+      ],
+      "postProcess": [
+        "absolute"
+      ]
+    },
+    "other": {
+      "labels": [
+        "duration",
+        "buy fill id",
+        "sell fill id",
+        "account"
+      ]
+    }
   }
 }
