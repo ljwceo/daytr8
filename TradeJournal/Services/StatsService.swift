@@ -201,6 +201,57 @@ public struct StatsService: Sendable {
         return (gross, 0, 0, true)
     }
 
+    // MARK: - Afleiden uit onvolledige gegevens (screenshot-import)
+
+    /// Exit-prijs die bij een bruto P&L hoort: de P&L-formule omgekeerd.
+    /// Afgerond op een hele tick. `nil` als er geen geldige tick-specificatie,
+    /// entry of aantal is.
+    public func exitPrice(
+        forGrossPnL grossPnL: Double,
+        entryPrice: Double,
+        quantity: Double,
+        direction: TradeDirection,
+        tickSize: Double,
+        tickValue: Double
+    ) -> Double? {
+        guard entryPrice > 0, quantity > 0, tickSize > 0, tickValue > 0 else { return nil }
+        let pointValue = tickValue / tickSize
+        let raw = entryPrice + grossPnL / (quantity * pointValue) * direction.sign
+        guard raw > 0 else { return nil }
+        let snapped = (raw / tickSize).rounded() * tickSize
+        return Self.rounded(snapped, toPrecisionOf: tickSize)
+    }
+
+    /// Aantal contracten/lots dat bij een bruto P&L en een prijsverschil hoort
+    /// (afgerond op 0,01 voor forex-lots). `nil` als dat niet eenduidig kan.
+    public func quantity(
+        forGrossPnL grossPnL: Double,
+        entryPrice: Double,
+        exitPrice: Double,
+        direction: TradeDirection,
+        tickSize: Double,
+        tickValue: Double
+    ) -> Double? {
+        guard tickSize > 0, tickValue > 0 else { return nil }
+        let pnlPerUnit = (exitPrice - entryPrice) * direction.sign * tickValue / tickSize
+        guard abs(pnlPerUnit) > .ulpOfOne else { return nil }
+        let quantity = ((grossPnL / pnlPerUnit) * 100).rounded() / 100
+        return quantity > 0 ? quantity : nil
+    }
+
+    /// Rondt `value` af op het aantal decimalen van `step` (0.25 → 2,
+    /// 0.00001 → 5), zodat afgeleide prijzen geen floating-point-ruis tonen.
+    static func rounded(_ value: Double, toPrecisionOf step: Double) -> Double {
+        var decimals = 0
+        var scaled = step
+        while decimals < 10, abs(scaled - scaled.rounded()) > 1e-9 {
+            scaled *= 10
+            decimals += 1
+        }
+        let factor = pow(10, Double(decimals))
+        return (value * factor).rounded() / factor
+    }
+
     // MARK: - Aggregatie
 
     /// Aggregatie over de opgegeven trades. Open trades tellen wel mee in
