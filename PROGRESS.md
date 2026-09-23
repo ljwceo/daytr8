@@ -670,6 +670,25 @@ Tests (`TradeJournalTests/`)
 - Nieuwe/verwijderde templates en regels komen via de seed alleen terug als
   er van die soort helemaal niets meer is.
 
+## Na fase 6 — fixes uit het testen op toestel
+
+- `MoreView`: melding van debug-acties (voorbeelddata/wissen) als pop-up; stond
+  onderaan de lijst buiten beeld.
+- Tradeformulier: nieuwe `DecimalFieldView` (`Views/Components/`) + pure
+  `DecimalInput` (`Utilities/`) — getallen worden bij elke toetsaanslag
+  doorgegeven (komma én punt); `TextField(value:format:)` deed dat pas bij
+  focusverlies, waardoor "Opslaan" uitgeschakeld bleef. Ook gebruikt in het
+  account- en regelformulier.
+- Tradeformulier: alleen het symbool is verplicht; entry-prijs alleen naast een
+  exit-prijs. Het formulier toont wat er nog ontbreekt. Trades zonder prijzen
+  tellen niet mee in P&L/win rate.
+- Tradeformulier: keuze **Uitgebreid / Snel** (standaard uitgebreid). Snel =
+  account, symbool, winst/verlies + bedrag, richting/datum, confluences en een
+  notitie. Nieuw veld `Trade.manualNetPnL`, gebruikt door `StatsService`;
+  backupformaat versie 3.
+- Tests: `DecimalInputTests`, uitbreidingen in `TradeFormViewModelTests`,
+  `StatsServiceTests` en `BackupServiceTests` (niet lokaal gedraaid).
+
 ## Volgende fase — Fase 7: Screenshot import (OCR)
 
 Op basis van `SPEC.md §12`: "Vul in vanuit screenshot" in het tradeformulier
