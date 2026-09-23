@@ -57,13 +57,24 @@ public enum SeedService {
 
     // MARK: - Confluences
 
+    /// Schiet de standaardset in zolang er nog geen enkele confluence bestaat.
+    /// Daarna beheert de gebruiker de lijst zelf (Meer → Confluences): een
+    /// verwijderde standaardconfluence komt dus niet bij de volgende start terug.
     public static func seedConfluencesIfNeeded(in context: ModelContext) {
+        guard fetchAll(Confluence.self, in: context).isEmpty else { return }
+        restoreDefaultConfluences(in: context)
+    }
+
+    /// Voegt de standaardconfluences toe die nog niet bestaan en geeft het
+    /// aantal toegevoegde terug. Bestaande confluences herkennen we op naam
+    /// (case-insensitive) — zo dupliceren we niet als de gebruiker eerder
+    /// handmatig een met dezelfde naam heeft aangemaakt.
+    @discardableResult
+    public static func restoreDefaultConfluences(in context: ModelContext) -> Int {
         let existing = fetchAll(Confluence.self, in: context)
-        // Bestaande confluences herkennen we op naam (case-insensitive) — zo
-        // duplicieren we niet als de gebruiker eerder handmatig een met dezelfde
-        // naam heeft aangemaakt.
         let existingNames: Set<String> = existing.reduce(into: []) { $0.insert($1.name.lowercased()) }
 
+        var inserted = 0
         for def in DefaultConfluences.all where !existingNames.contains(def.name.lowercased()) {
             let conf = Confluence(
                 name: def.name,
@@ -74,7 +85,9 @@ public enum SeedService {
                 sortOrder: def.sortOrder
             )
             context.insert(conf)
+            inserted += 1
         }
+        return inserted
     }
 
     // MARK: - Journal-templates

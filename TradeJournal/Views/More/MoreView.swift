@@ -6,6 +6,8 @@ import SwiftData
 /// - Journal (fase 6): progress tracker, notebook en journal-templates.
 /// - Accounts & doelen (fase 6): accounts met maanddoel, daily loss limit en
 ///   max drawdown; backtest-accounts.
+/// - Trading: beheer van confluences (toevoegen, bewerken, archiveren,
+///   verwijderen).
 /// - Instellingen (fase 6): journal-herinnering en app-slot; fase 7:
 ///   overzicht van de screenshot-templates.
 /// - Data: backup & herstel (incl. automatische backup en CSV-export) en
@@ -69,6 +71,14 @@ struct MoreView: View {
                         }
                     }
 
+                    Section("Trading") {
+                        NavigationLink {
+                            ConfluencesView()
+                        } label: {
+                            Label("Confluences", systemImage: "checklist")
+                        }
+                    }
+
                     Section("Instellingen") {
                         NavigationLink {
                             ReminderSettingsView()
@@ -111,7 +121,7 @@ struct MoreView: View {
                     Section("Debug (fase 1)") {
                         Button {
                             perform { SeedService.seedDefaultsIfNeeded(in: modelContext) }
-                            lastMessage = "Standaardconfluences en instrumentpresets ingeschoten."
+                            lastMessage = "Standaarddata ingeschoten (confluences alleen als er nog geen enkele is)."
                         } label: {
                             Label("Standaarddata inschieten", systemImage: "square.and.arrow.down")
                         }
