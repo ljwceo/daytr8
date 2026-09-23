@@ -238,37 +238,35 @@ public enum SampleDataService {
     /// De standaardconfluences en instrumentpresets worden op de volgende
     /// call van `SeedService.seedDefaultsIfNeeded` opnieuw aangemaakt.
     ///
-    /// Gebruikt per type een batch-delete (`ModelContext.delete(model:)`), zodat
-    /// de objecten niet eerst allemaal in het geheugen geladen worden. Eén voor
-    /// één verwijderen was bij jaren aan data erg traag (elke trade werkt ook de
-    /// many-to-many-lijsten van confluences/tags/mistakes bij) en kon de app
-    /// laten vastlopen. Alleen als een batch-delete faalt, valt deze functie
-    /// voor dat type terug op object-voor-object verwijderen.
+    /// Verwijdert per type object voor object via de context, kinderen vóór
+    /// ouders, en slaat tussentijds op in blokken (`deleteChunkSize`).
+    ///
+    /// Geen batch-delete (`ModelContext.delete(model:)`): die draait buiten de
+    /// context om en weigert dit schema ("mandatory OTO nullify inverse" op
+    /// o.a. `PlaybookRuleAdherence.rule`). Een half gelukte batch-delete liet
+    /// bovendien objecten in de context achter waarvan de rij al weg was;
+    /// die later aanraken gaf een fatal error ("model instance was
+    /// invalidated"). Per object verwijderen past de relatieregels correct toe;
+    /// tussentijds opslaan houdt het geheugengebruik bij jaren aan data beperkt.
     public static func wipeAll(in context: ModelContext) {
         // Volgorde: eerst kinderen, dan ouders.
-        batchDelete(TradeExecution.self, in: context)
-        batchDelete(TradeScreenshot.self, in: context)
-        batchDelete(PlaybookRuleAdherence.self, in: context)
-        batchDelete(Trade.self, in: context)
-        batchDelete(PlaybookRule.self, in: context)
-        batchDelete(Playbook.self, in: context)
-        batchDelete(DailyJournalScreenshot.self, in: context)
-        batchDelete(DailyJournal.self, in: context)
-        batchDelete(NotebookNote.self, in: context)
-        batchDelete(DailyRuleCheck.self, in: context)
-        batchDelete(DailyRule.self, in: context)
-        batchDelete(JournalTemplate.self, in: context)
-        batchDelete(Tag.self, in: context)
-        batchDelete(Mistake.self, in: context)
-        batchDelete(Confluence.self, in: context)
-        batchDelete(Instrument.self, in: context)
-        batchDelete(Account.self, in: context)
-
-        do { try context.save() } catch {
-            #if DEBUG
-            print("SampleDataService.wipeAll error: \(error)")
-            #endif
-        }
+        deleteAll(TradeExecution.self, in: context)
+        deleteAll(TradeScreenshot.self, in: context)
+        deleteAll(PlaybookRuleAdherence.self, in: context)
+        deleteAll(Trade.self, in: context)
+        deleteAll(PlaybookRule.self, in: context)
+        deleteAll(Playbook.self, in: context)
+        deleteAll(DailyJournalScreenshot.self, in: context)
+        deleteAll(DailyJournal.self, in: context)
+        deleteAll(NotebookNote.self, in: context)
+        deleteAll(DailyRuleCheck.self, in: context)
+        deleteAll(DailyRule.self, in: context)
+        deleteAll(JournalTemplate.self, in: context)
+        deleteAll(Tag.self, in: context)
+        deleteAll(Mistake.self, in: context)
+        deleteAll(Confluence.self, in: context)
+        deleteAll(Instrument.self, in: context)
+        deleteAll(Account.self, in: context)
     }
 
     // MARK: - Helpers
@@ -277,16 +275,24 @@ public enum SampleDataService {
         (try? context.fetch(FetchDescriptor<T>())) ?? []
     }
 
-    private static func batchDelete<T: PersistentModel>(_ type: T.Type, in context: ModelContext) {
-        do {
-            try context.delete(model: type)
-        } catch {
-            #if DEBUG
-            print("SampleDataService batch delete \(type) failed, fallback: \(error)")
-            #endif
-            for obj in fetch(type, in: context) {
-                context.delete(obj)
+    /// Aantal verwijderingen tussen twee saves in `wipeAll`.
+    static let deleteChunkSize = 500
+
+    private static func deleteAll<T: PersistentModel>(_ type: T.Type, in context: ModelContext) {
+        for (index, object) in fetch(type, in: context).enumerated() {
+            context.delete(object)
+            if (index + 1) % deleteChunkSize == 0 {
+                saveQuietly(context)
             }
+        }
+        saveQuietly(context)
+    }
+
+    private static func saveQuietly(_ context: ModelContext) {
+        do { try context.save() } catch {
+            #if DEBUG
+            print("SampleDataService.wipeAll save error: \(error)")
+            #endif
         }
     }
 

@@ -703,6 +703,22 @@ Tests (`TradeJournalTests/`)
 - Meegenomen: fix in `FillAggregatorTests` (defaulted `symbol`-parameter van de
   `fill`-helper naar het einde verplaatst).
 
+### Test-gate weer aan (na fase 7)
+
+- Oorzaak van de laatste rode tests: `SampleDataService.wipeAll` gebruikte
+  batch-delete (`ModelContext.delete(model:)`). Die faalt op dit schema
+  ("mandatory OTO nullify inverse", o.a. `PlaybookRuleAdherence.rule`); de
+  fallback raakte daarna objecten aan waarvan de rij al weg was → fatal error
+  ("model instance was invalidated"). Drie tests crashten
+  (`BackupServiceTests` ×2, `SeedAndSampleDataTests.test_wipeAll_removesEverything`)
+  en `JournalTemplateServiceTests.test_seed_isIdempotent…` faalde. In de app
+  kon "Alles wissen" en backup-restore hierdoor crashen.
+- Fix: `wipeAll` verwijdert per type object voor object via de context
+  (kinderen vóór ouders) met een save per 500 verwijderingen.
+- Alle unit tests groen in CI (workflow_dispatch-run #28). Daarna is de gate
+  teruggezet: `build` heeft weer `needs: test` en `continue-on-error` is weg
+  van de `test`-job. Een rode test blokkeert de IPA dus weer.
+
 ## Fase 7 — Screenshot import (OCR) ✅
 
 Doel: `SPEC.md §12` — "Vul in vanuit screenshot" in het tradeformulier: een
@@ -794,8 +810,7 @@ Tests (`TradeJournalTests/`)
       formulier leeg met alleen de screenshot en een nette melding.
 - [x] Instellingen tonen de lijst met beschikbare templates.
 - [x] Parser-tests met tekstfixtures per template.
-- [ ] Groene `test`-job in CI — hangt af van de bestaande test-compileerfouten
-      uit fase 5/6 (aparte batch); de IPA-build is niet van de tests afhankelijk.
+- [x] Groene `test`-job in CI (na de `wipeAll`-fix, zie "Test-gate weer aan").
 
 ### Openstaande punten
 
@@ -808,12 +823,10 @@ Tests (`TradeJournalTests/`)
 - Vision draait met `en-US`; Nederlandse labels werken via eigen regexen, maar
   zonder taalmodel.
 - `README.md` beschrijft nog de status van fase 2.
-- Test-compileerfouten uit fase 5/6 opruimen en daarna de test-gate in CI
-  terugzetten (zie hierboven).
 
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
-screenshot-templates na. Voorstel voor de volgende stappen: (1) de
-test-compileerfouten opruimen en de CI-test-gate terugzetten, (2) een
-template-editor voor eigen screenshot-templates.
+screenshot-templates na. De unit tests zijn groen en blokkeren de IPA-build
+weer. Voorstel voor de volgende stap: een template-editor voor eigen
+screenshot-templates.
