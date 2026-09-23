@@ -824,6 +824,56 @@ Tests (`TradeJournalTests/`)
   zonder taalmodel.
 - `README.md` beschrijft nog de status van fase 2.
 
+## Na fase 7 — templates afgestemd op echte screenshots
+
+Doel: de screenshot-templates (gemaakt op bekende labels) afstemmen op echte
+broker-screenshots. Alleen JSON-templates en fixtures aangepast; geen
+Swift-wijziging in de parser. Voorlopig gebruikt de gebruiker alleen
+MetaTrader 5 (iOS-app), dus alleen dat template is bijgesteld.
+
+### MetaTrader (`metatrader.json`)
+
+Op main herkende de app een MT5-screenshot helemaal niet ("Geen
+tradegegevens herkend"): de iOS-app toont geen platformnaam en geen labels in
+de lijst, en schrijft `NAS100 buy 10` zonder komma (MT4: `EURUSD, buy 1.00`).
+
+- Keywords: `→` en `->` (pijl tussen open- en sluitprijs) erbij.
+- Symbool, richting en lots: komma na het symbool is optioneel.
+- Bruto P&L: rechts op de symboolregel (lijst) of op de prijsregel
+  (opengeklapt); bedragen met een spatie als duizendtalscheiding
+  (`1 040.25`, `-1 044.67`) blijven hele getallen.
+- Entry/exit: prijspaar ook zonder (of met anders gelezen) pijl als er een
+  datum op volgt.
+- Tijden: sluittijd na het prijspaar (lijst); `open → sluit` op één regel
+  (opengeklapt) levert entry- en exit-tijd.
+- Commissie: MT5 noemt het `Charges`.
+
+### Fixtures (`TradeJournalTests/ScreenshotParserTests.swift`)
+
+Uitgeschreven zoals `ScreenshotLineBuilder` de regels opbouwt, vanaf echte
+screenshots (geen ruwe Vision-uitvoer beschikbaar):
+
+- `metaTrader5History` — ingeklapte geschiedenislijst, twee short-trades.
+- `metaTrader5HistoryLong` — lijst met tien trades, buy/sell, duizendtallen.
+- `metaTrader5Expanded` — opengeklapte trade met S/L, T/P, open → sluittijd
+  en lege Swap/Charges (`-`).
+- Plus een losse test op P&L met duizendtallen. De bestaande fixtures (ook de
+  oude MT4-achtige `metaTrader`) zijn ongewijzigd groen.
+
+### Openstaande punten
+
+- Aanname: Vision leest de pijl als `→` (of `->`, `➝`, `>`). In de ingeklapte
+  lijst is dat het enige herkenningsteken; leest Vision hem anders, dan wordt
+  MetaTrader daar niet herkend. De opengeklapte weergave heeft ook `S/L`,
+  `T/P` en `Swap`. Nog te bevestigen op het toestel met de IPA van deze branch.
+- Meerdere trades op één screenshot: de eerste is het voorstel, de rest komt
+  als alternatieven per veld (niet per trade gekoppeld). Eén trade per
+  screenshot (of opengeklapt) geeft het beste resultaat.
+- Andere brokers (Tradovate, TopstepX, NinjaTrader, TradingView) zijn nog niet
+  tegen echte screenshots getest.
+- Een S/L die naar winst verschoven is, geeft een R-multiple die niet op het
+  oorspronkelijke risico gebaseerd is (geen parserfout).
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
