@@ -554,8 +554,9 @@ Nieuwe tests (`TradeJournalTests/`)
 - [x] Unit tests voor CSV-parser, import, fill-aggregatie, export, zip en backup.
 - [x] `PROGRESS.md` en `README.md` bijgewerkt.
 - [x] Groene CI-run (unsigned IPA-build, workflow_dispatch op deze branch).
-- [ ] Unit tests lokaal draaien (`xcodebuild test`) — de CI bouwt alleen de
-      app en in deze sessie was geen Swift-toolchain beschikbaar.
+- [x] Unit tests draaien in CI (`xcodebuild test` op de nieuwste beschikbare
+      iOS Simulator; `build`-job is nu `needs: test` zodat een rode test de IPA
+      blokkeert).
 
 ### Openstaande punten
 
@@ -658,8 +659,9 @@ Tests (`TradeJournalTests/`)
 - [x] Optioneel Face ID / code-slot bij openen.
 - [x] Backups bevatten de nieuwe data (formaatversie 2, v1 blijft werken).
 - [x] Groene CI-run (unsigned IPA-build, workflow_dispatch op deze branch).
-- [ ] Unit tests lokaal draaien (`xcodebuild test`) — de CI bouwt alleen de
-      app en in deze sessie was geen Swift-toolchain beschikbaar.
+- [x] Unit tests draaien in CI (`xcodebuild test` op de nieuwste beschikbare
+      iOS Simulator; `build`-job is nu `needs: test` zodat een rode test de IPA
+      blokkeert).
 
 ### Openstaande punten
 
