@@ -97,6 +97,17 @@ final class ScreenshotParserTests: XCTestCase {
         Swap:  -1.20
         """
 
+        /// Echte screenshot: MetaTrader 5 (iOS), tab Geschiedenis, ingeklapte
+        /// rijen met twee trades. Geen labels en geen platformnaam in beeld;
+        /// "sell 2.5" = richting + lots, de P&L staat rechts op de eerste regel,
+        /// de tijd rechts op de tweede is de sluittijd.
+        static let metaTrader5History = """
+        NAS100 sell 2.5  -169.53
+        27722.47 \u{2192} 27799.66  2026.07.29 16:33:04
+        NAS100 sell 2.5  183.17
+        27615.86 \u{2192} 27532.41  2026.07.29 17:13:04
+        """
+
         static let tradingView = """
         TradingView
         Paper Trading
@@ -246,6 +257,30 @@ final class ScreenshotParserTests: XCTestCase {
         XCTAssertEqual(result.fees?.value, 1.2, "Negatieve swap is een kost (postProcess negate)")
         XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 10, 15, 3))
         XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 11, 2, 44))
+    }
+
+    /// Ingeklapte geschiedenislijst zonder labels: platform herkennen aan de
+    /// pijl tussen open- en sluitprijs, de eerste trade is het voorstel, de
+    /// volgende komt als alternatief.
+    func test_metaTrader5_historyListWithoutLabels() {
+        let result = makeParser().parse(Fixture.metaTrader5History)
+
+        XCTAssertEqual(result.templateID, "metatrader")
+        XCTAssertEqual(result.symbol?.value, "NAS100")
+        XCTAssertEqual(result.direction?.value, .short)
+        XCTAssertEqual(result.quantity?.value, 2.5)
+        XCTAssertEqual(result.entryPrice?.value, 27722.47)
+        XCTAssertEqual(result.entryPrice?.alternatives, [27615.86])
+        XCTAssertEqual(result.exitPrice?.value, 27799.66)
+        XCTAssertEqual(result.exitPrice?.alternatives, [27532.41])
+        XCTAssertEqual(result.grossPnL?.value, -169.53)
+        XCTAssertEqual(result.grossPnL?.alternatives, [183.17])
+        XCTAssertNil(result.netPnL)
+        XCTAssertNil(result.stopLoss)
+        XCTAssertNil(result.takeProfit)
+        XCTAssertNil(result.entryTime, "De ingeklapte rij toont alleen de sluittijd")
+        XCTAssertEqual(result.exitTime?.value, utcDate(2026, 7, 29, 16, 33, 4))
+        XCTAssertEqual(result.exitTime?.alternatives, [utcDate(2026, 7, 29, 17, 13, 4)])
     }
 
     // MARK: - TradingView
