@@ -874,6 +874,34 @@ screenshots (geen ruwe Vision-uitvoer beschikbaar):
 - Een S/L die naar winst verschoven is, geeft een R-multiple die niet op het
   oorspronkelijke risico gebaseerd is (geen parserfout).
 
+### Vervolg na test op toestel: P&L van de broker en prijsweergave
+
+Op het toestel werd de MT5-trade goed gelezen, maar de netto P&L was
+US$ 169.650 in plaats van 1 450.14: het uitgebreide formulier rekende de P&L
+uit prijzen × aantal × tick value, en NAS100 had geen instrument (standaard
+tick size 0.01 / tick value 1 = $100 per punt). Ook met de juiste tick value
+wijkt het af, omdat MT5 in de valuta van het account (EUR) rekent.
+
+- `TradeFormViewModel` — `brokerNetPnL`: in de uitgebreide invoer het
+  resultaat zoals de broker het toont. Gezet → opgeslagen als
+  `Trade.manualNetPnL` (gaat al vóór de prijsberekening in `StatsService`);
+  leeg → P&L uit de prijzen. De screenshot-import vult het met netto P&L, of
+  bruto min de gelezen kosten; bruto-alternatieven (lijst met meerdere trades)
+  zijn kiesbaar in de chip-rij. Bewerken van een trade met prijzen én
+  `manualNetPnL` opent uitgebreid (voorheen altijd "Snel").
+  Geen wijziging aan SwiftData-schema of backupformaat.
+- `TradeFormView` — sectie "Resultaat volgens broker" (Netto P&L, met
+  OCR-icoon en uitleg) onder Kosten.
+- `TradeDetailView` — prijzen, aantal, MAE/MFE volledig tonen
+  (`DecimalInput.format`) in plaats van `%.5g` (27371.55 werd 27372).
+- Tests: `TradeFormScreenshotImportTests` (MT5-import → P&L 1 450.14 ook na
+  opslaan, kosten eraf, leegmaken = prijzen, alternatieven) en
+  `TradeFormViewModelTests` (bewerken houdt het broker-resultaat).
+- Openstaand: de R-multiple deelt het broker-resultaat door de risk uit
+  prijzen × tick value; zet voor NAS100 een instrument met de juiste tick
+  value (MT5: meestal tick size 0.01, tick value 0.01) — het valutaverschil
+  (EUR-account) blijft dan klein maar bestaat.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen

@@ -84,6 +84,77 @@ final class TradeFormScreenshotImportTests: XCTestCase {
         XCTAssertTrue(viewModel.ocrMessage?.contains("Geen tradegegevens") ?? false)
     }
 
+    /// Echte MT5-screenshot (opengeklapte trade), NAS100 zonder eigen
+    /// instrument: de P&L van de broker gaat vóór de berekening met de
+    /// standaard tick value (die gaf 33.93 × 50 × $100 = 169.650).
+    func test_import_metaTrader5_brokerPnLGoesBeforeCalculation() async throws {
+        let lines = [
+            "NAS100 buy 50  #119092393",
+            "NAS100 Cash",
+            "27371.55 \u{2192} 27405.48  1 450.14",
+            "\u{0394} = 3393 (0.12%)",
+            "2026.04.30 15:12:01 \u{2192} 2026.04.30 15:22:27",
+            "S/L:  27406.48  Swap:  -",
+            "T/P:  27441.99  Charges:  -"
+        ]
+        let viewModel = makeViewModel(recognizer: StubRecognizer(lines: lines))
+
+        await viewModel.importScreenshot(screenshot, instruments: [])
+
+        XCTAssertEqual(viewModel.entryStyle, .detailed)
+        XCTAssertEqual(viewModel.values.entryPrice, 27371.55)
+        XCTAssertEqual(viewModel.values.exitPrice, 27405.48)
+        XCTAssertEqual(viewModel.brokerNetPnL, 1450.14)
+        XCTAssertEqual(viewModel.ocrOrigin(for: .netPnL), .derived, "Bruto van de screenshot min (lege) kosten")
+        XCTAssertEqual(viewModel.livePreview.netPnL, 1450.14, accuracy: 0.001)
+
+        let container = try ModelContainer(for: Schema(AppSchema.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+        let trade = viewModel.save(in: container.mainContext)
+
+        XCTAssertEqual(trade.manualNetPnL, 1450.14)
+        XCTAssertEqual(trade.entryPrice, 27371.55, "Prijzen blijven bewaard")
+        XCTAssertEqual(StatsService().metrics(for: trade).netPnL, 1450.14, accuracy: 0.001)
+    }
+
+    func test_apply_brokerPnLMinusCosts_andClearingUsesPrices() {
+        let viewModel = makeViewModel()
+        var result = ScreenshotParseResult(templateID: "metatrader", templateName: "MetaTrader")
+        result.symbol = ParsedField(value: "NAS100", source: "MetaTrader")
+        result.direction = ParsedField(value: TradeDirection.long, source: "MetaTrader")
+        result.entryPrice = ParsedField(value: 27371.55, source: "MetaTrader")
+        result.exitPrice = ParsedField(value: 27405.48, source: "MetaTrader")
+        result.quantity = ParsedField(value: 50.0, source: "MetaTrader")
+        result.grossPnL = ParsedField(value: 1450.14, source: "MetaTrader")
+        result.commission = ParsedField(value: 3.5, source: "MetaTrader")
+
+        viewModel.applyScreenshotResult(result, instruments: [])
+
+        XCTAssertEqual(viewModel.brokerNetPnL ?? 0, 1446.64, accuracy: 0.0001, "Bruto − commissie")
+        XCTAssertEqual(viewModel.livePreview.grossPnL, 1450.14, accuracy: 0.001)
+
+        viewModel.brokerNetPnL = nil
+        let pointValue = viewModel.values.tickValue / viewModel.values.tickSize
+        XCTAssertEqual(viewModel.livePreview.grossPnL, (27405.48 - 27371.55) * 50 * pointValue, accuracy: 0.01, "Leeg: weer uit de prijzen")
+    }
+
+    /// Lijst met meerdere trades: de bruto-alternatieven zijn kiesbaar als
+    /// resultaat, net als de prijzen.
+    func test_candidates_brokerPnLFromGrossAlternatives() {
+        let viewModel = makeViewModel()
+        var result = ScreenshotParseResult(templateID: "metatrader", templateName: "MetaTrader")
+        result.symbol = ParsedField(value: "NAS100", source: "MetaTrader")
+        result.entryPrice = ParsedField(value: 27722.47, alternatives: [27615.86], source: "MetaTrader")
+        result.exitPrice = ParsedField(value: 27799.66, alternatives: [27532.41], source: "MetaTrader")
+        result.grossPnL = ParsedField(value: -169.53, alternatives: [183.17], source: "MetaTrader")
+
+        viewModel.applyScreenshotResult(result, instruments: [])
+
+        XCTAssertEqual(viewModel.ocrCandidates(for: .netPnL).map(\.isSelected), [true, false])
+        viewModel.selectOCRCandidate(1, for: .netPnL)
+        XCTAssertEqual(viewModel.brokerNetPnL, 183.17)
+        XCTAssertEqual(viewModel.entryStyle, .detailed)
+    }
+
     // MARK: - Symbool tegen de instrumenttabel
 
     func test_apply_symbolMatchesOwnInstrument() throws {

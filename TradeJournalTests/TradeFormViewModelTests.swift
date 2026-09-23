@@ -220,6 +220,29 @@ final class TradeFormViewModelTests: XCTestCase {
         XCTAssertEqual(edit.quickAmount, 250)
     }
 
+    /// Uitgebreide trade met het resultaat van de broker: bewerken opent
+    /// uitgebreid (met de prijzen) en het resultaat blijft staan.
+    func test_detailedEntry_withBrokerPnL_opensDetailedAndKeepsIt() throws {
+        let container = try ModelContainer(for: Schema(AppSchema.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+        let context = container.mainContext
+        let trade = Trade(symbol: "NAS100", direction: .long, entryDate: Date(), exitDate: Date(), entryPrice: 27371.55, exitPrice: 27405.48, quantity: 50, manualNetPnL: 1450.14)
+        context.insert(trade)
+
+        let viewModel = TradeFormViewModel(mode: .edit(trade))
+        XCTAssertEqual(viewModel.entryStyle, .detailed)
+        XCTAssertEqual(viewModel.brokerNetPnL, 1450.14)
+
+        viewModel.values.rating = 4
+        viewModel.save(in: context)
+        XCTAssertEqual(trade.manualNetPnL, 1450.14)
+
+        // Leeggemaakt: P&L weer uit de prijzen.
+        let edit = TradeFormViewModel(mode: .edit(trade))
+        edit.brokerNetPnL = nil
+        edit.save(in: context)
+        XCTAssertNil(trade.manualNetPnL)
+    }
+
     func test_detailedEntry_clearsManualPnL() throws {
         let container = try ModelContainer(for: Schema(AppSchema.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
         let context = container.mainContext

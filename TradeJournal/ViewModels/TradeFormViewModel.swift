@@ -50,6 +50,12 @@ public final class TradeFormViewModel {
     public var quickIsProfit: Bool = true
     public var quickAmount: Double = 0
 
+    /// Uitgebreid: netto resultaat zoals de broker het toont (bijv. van de
+    /// screenshot, in de valuta van het account). Gezet → gaat vóór de
+    /// berekening uit prijzen × tick value (`Trade.manualNetPnL`); `nil` →
+    /// P&L uit de prijzen.
+    public var brokerNetPnL: Double?
+
     // MARK: Screenshot-import (OCR)
 
     /// Hoe een veld door de screenshot-import is ingevuld.
@@ -107,9 +113,14 @@ public final class TradeFormViewModel {
         case .edit(let trade):
             self.values = editingService.values(from: trade)
             if let manual = trade.manualNetPnL {
-                entryStyle = .quick
-                quickIsProfit = manual >= 0
-                quickAmount = abs(manual)
+                if trade.entryPrice == 0, (trade.exitPrice ?? 0) == 0 {
+                    entryStyle = .quick
+                    quickIsProfit = manual >= 0
+                    quickAmount = abs(manual)
+                } else {
+                    // Uitgebreide trade met het resultaat van de broker.
+                    brokerNetPnL = manual
+                }
             }
         }
     }
@@ -162,14 +173,15 @@ public final class TradeFormViewModel {
     }
 
     /// Zet `manualNetPnL` volgens de gekozen stijl. Snel: resultaat handmatig
-    /// en de trade telt als gesloten; uitgebreid: P&L weer uit de prijzen.
+    /// en de trade telt als gesloten; uitgebreid: het resultaat van de broker
+    /// als dat is ingevuld, anders P&L uit de prijzen.
     private func applyEntryStyle() {
         switch entryStyle {
         case .quick:
             values.manualNetPnL = quickNetPnL
             if values.exitDate == nil { values.exitDate = values.entryDate }
         case .detailed:
-            values.manualNetPnL = nil
+            values.manualNetPnL = brokerNetPnL
         }
     }
 
@@ -196,7 +208,7 @@ public final class TradeFormViewModel {
             fees: values.fees,
             tickSize: values.tickSize,
             tickValue: values.tickValue,
-            manualNetPnL: entryStyle == .quick ? quickNetPnL : nil
+            manualNetPnL: entryStyle == .quick ? quickNetPnL : brokerNetPnL
         )
         return statsService.metrics(for: transient)
     }
@@ -425,20 +437,34 @@ public final class TradeFormViewModel {
         }
     }
 
-    /// Met prijzen: uitgebreide invoer. Alleen een resultaat (geen prijzen):
-    /// snelle invoer met dat bedrag.
+    /// Netto P&L van de screenshot: netto zoals getoond, of bruto min de
+    /// gelezen kosten (met de bruto-alternatieven als netto-alternatieven).
+    private static func screenshotNetPnL(from result: ScreenshotParseResult) -> ParsedField<Double>? {
+        if let net = result.netPnL { return net }
+        guard let gross = result.grossPnL else { return nil }
+        let costs = (result.commission?.value ?? 0) + (result.fees?.value ?? 0)
+        let toNet = { (value: Double) in StatsService.rounded(value - costs, toPrecisionOf: 0.01) }
+        return ParsedField(
+            value: toNet(gross.value),
+            alternatives: gross.alternatives.map(toNet),
+            source: gross.source,
+            isDerived: true
+        )
+    }
+
+    /// Met prijzen: uitgebreide invoer; een P&L op de screenshot wordt het
+    /// resultaat van de broker (gaat vóór de berekening, die bij een andere
+    /// accountvaluta of onbekende tick value afwijkt). Alleen een resultaat
+    /// (geen prijzen): snelle invoer met dat bedrag.
     private func applyOCREntryStyle(from result: ScreenshotParseResult) {
+        let net = Self.screenshotNetPnL(from: result)?.value
         if values.entryPrice > 0 || result.exitPrice != nil {
             entryStyle = .detailed
+            if let net {
+                brokerNetPnL = net
+                ocrOrigins[.netPnL] = result.netPnL != nil ? .recognized : .derived
+            }
             return
-        }
-        let net: Double?
-        if let parsedNet = result.netPnL?.value {
-            net = parsedNet
-        } else if let gross = result.grossPnL?.value {
-            net = gross - (result.commission?.value ?? 0) - (result.fees?.value ?? 0)
-        } else {
-            net = nil
         }
         guard let net else { return }
         entryStyle = .quick
@@ -497,7 +523,7 @@ public final class TradeFormViewModel {
         case .fees:
             return Self.candidates(result.fees, current: values.fees, label: Self.numberLabel)
         case .netPnL:
-            return Self.candidates(result.netPnL, current: quickNetPnL, label: Self.numberLabel)
+            return Self.candidates(Self.screenshotNetPnL(from: result), current: entryStyle == .quick ? quickNetPnL : brokerNetPnL, label: Self.numberLabel)
         case .entryTime:
             return Self.candidates(result.entryTime, current: values.entryDate, label: Self.dateLabel)
         case .exitTime:
@@ -544,9 +570,13 @@ public final class TradeFormViewModel {
             guard let fees = pick(result.fees) else { return }
             values.fees = fees
         case .netPnL:
-            guard let net = pick(result.netPnL) else { return }
-            quickIsProfit = net >= 0
-            quickAmount = abs(net)
+            guard let net = pick(Self.screenshotNetPnL(from: result)) else { return }
+            if entryStyle == .quick {
+                quickIsProfit = net >= 0
+                quickAmount = abs(net)
+            } else {
+                brokerNetPnL = net
+            }
         case .entryTime:
             guard let date = pick(result.entryTime) else { return }
             values.entryDate = date

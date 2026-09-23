@@ -62,6 +62,7 @@ struct TradeFormView: View {
                     timingSection
                     pricesSection
                     costsSection
+                    brokerResultSection
                     playbookSection
                     confluencesSection
                     tagsAndMistakesSection
@@ -450,6 +451,24 @@ struct TradeFormView: View {
             numberRow("Commissie", value: $viewModel.values.commission, ocrField: .commission)
             numberRow("Fees", value: $viewModel.values.fees, ocrField: .fees)
         }
+    }
+
+    /// Resultaat zoals de broker het toont; gaat vóór de berekening uit prijzen.
+    private var brokerResultSection: some View {
+        Section {
+            numberRow("Netto P&L", value: brokerNetPnLBinding, ocrField: .netPnL)
+        } header: {
+            Text("Resultaat volgens broker")
+        } footer: {
+            Text("Leeg: P&L uit prijzen, aantal en tick value. Ingevuld (bijv. van de screenshot, in de valuta van je account) gaat dit bedrag voor.")
+        }
+    }
+
+    private var brokerNetPnLBinding: Binding<Double> {
+        Binding<Double>(
+            get: { viewModel.brokerNetPnL ?? 0 },
+            set: { viewModel.brokerNetPnL = $0 == 0 ? nil : $0 }
+        )
     }
 
     /// Getalrij; met `ocrField` ook het "uit OCR"-icoon en eventuele alternatieven.
