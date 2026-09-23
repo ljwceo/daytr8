@@ -287,4 +287,15 @@ final class StatsServiceTests: XCTestCase {
         stats.recomputeSession(for: t)
         XCTAssertEqual(t.session, .nyAM)
     }
+
+    // MARK: - Snelle invoer
+
+    func test_metrics_manualNetPnL_overridesPrices() {
+        let trade = Trade(symbol: "NQ", direction: .long, entryDate: Date(), exitDate: Date(),
+                          entryPrice: 0, quantity: 1, commission: 4, fees: 1, manualNetPnL: 300)
+        let metrics = StatsService().metrics(for: trade)
+        XCTAssertEqual(metrics.netPnL, 300, accuracy: 0.001)
+        XCTAssertEqual(metrics.grossPnL, 305, accuracy: 0.001)
+        XCTAssertEqual(metrics.outcome, .win)
+    }
 }

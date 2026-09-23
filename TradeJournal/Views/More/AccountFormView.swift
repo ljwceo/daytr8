@@ -98,7 +98,7 @@ struct AccountFormView: View {
             Text(title)
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
-            TextField(title, value: value, format: .number)
+            DecimalFieldView(title: title, value: value)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(Theme.textPrimary)

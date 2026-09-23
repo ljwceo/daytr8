@@ -128,14 +128,6 @@ struct MoreView: View {
                         }
                         .disabled(isBusy)
                     }
-
-                    if let lastMessage {
-                        Section {
-                            Text(lastMessage)
-                                .font(.footnote)
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                    }
                 }
                 .scrollContentBackground(.hidden)
                 .background(Theme.background)
@@ -152,6 +144,14 @@ struct MoreView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingCSVImport) {
                 CSVImportView()
+            }
+            // Resultaat van een debug-actie als pop-up: onderaan de lijst viel
+            // de melding buiten beeld.
+            .alert(
+                lastMessage ?? "",
+                isPresented: Binding(get: { lastMessage != nil }, set: { if !$0 { lastMessage = nil } })
+            ) {
+                Button("OK", role: .cancel) { lastMessage = nil }
             }
             .confirmationDialog(
                 "Weet je zeker dat je alle data wilt wissen?",

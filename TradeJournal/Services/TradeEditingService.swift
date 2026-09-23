@@ -51,6 +51,8 @@ public struct TradeEditingService {
         public var mistakes: [Mistake]
         /// `id`'s van de regels van `playbook` die als "gevolgd" zijn aangevinkt.
         public var followedRuleIDs: Set<UUID>
+        /// Handmatig netto resultaat (snelle invoer); `nil` = uit prijzen berekenen.
+        public var manualNetPnL: Double?
 
         public init(
             account: Account? = nil,
@@ -80,7 +82,8 @@ public struct TradeEditingService {
             confluences: [Confluence] = [],
             tags: [Tag] = [],
             mistakes: [Mistake] = [],
-            followedRuleIDs: Set<UUID> = []
+            followedRuleIDs: Set<UUID> = [],
+            manualNetPnL: Double? = nil
         ) {
             self.account = account
             self.instrument = instrument
@@ -110,6 +113,7 @@ public struct TradeEditingService {
             self.tags = tags
             self.mistakes = mistakes
             self.followedRuleIDs = followedRuleIDs
+            self.manualNetPnL = manualNetPnL
         }
 
         /// Standaardwaarden voor een nieuwe trade: neemt account, instrument,
@@ -175,7 +179,8 @@ public struct TradeEditingService {
             confluences: trade.confluences,
             tags: trade.tags,
             mistakes: trade.mistakes,
-            followedRuleIDs: Set(trade.ruleAdherence.filter(\.followed).compactMap { $0.rule?.id })
+            followedRuleIDs: Set(trade.ruleAdherence.filter(\.followed).compactMap { $0.rule?.id }),
+            manualNetPnL: trade.manualNetPnL
         )
     }
 
@@ -209,7 +214,8 @@ public struct TradeEditingService {
             isBacktest: values.isBacktest,
             account: values.account,
             instrument: values.instrument,
-            playbook: values.playbook
+            playbook: values.playbook,
+            manualNetPnL: values.manualNetPnL
         )
         context.insert(trade)
         apply(relationships: values, to: trade, in: context)
@@ -243,6 +249,7 @@ public struct TradeEditingService {
         trade.account = values.account
         trade.instrument = values.instrument
         trade.playbook = values.playbook
+        trade.manualNetPnL = values.manualNetPnL
 
         apply(relationships: values, to: trade, in: context)
         statsService.recomputeSession(for: trade)

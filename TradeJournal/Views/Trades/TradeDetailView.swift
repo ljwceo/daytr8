@@ -48,7 +48,8 @@ struct TradeDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
-                    priceCard
+                    // Snelle trade zonder prijzen: geen lege prijzenkaart.
+                    if trade.manualNetPnL == nil || trade.entryPrice != 0 { priceCard }
                     if !trade.confluences.isEmpty { confluencesCard }
                     if let playbook = trade.playbook, !playbook.rules.isEmpty { playbookCard(playbook) }
                     if !trade.tags.isEmpty || !trade.mistakes.isEmpty { tagsAndMistakesCard }

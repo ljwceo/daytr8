@@ -122,7 +122,7 @@ private struct DailyRuleEditorView: View {
                         HStack {
                             Text(thresholdLabel)
                             Spacer()
-                            TextField("Grens", value: $draft.threshold, format: .number)
+                            DecimalFieldView(title: "Grens", value: $draft.threshold)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                         }

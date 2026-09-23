@@ -10,6 +10,22 @@ import SwiftData
 @Observable
 public final class TradeFormViewModel {
 
+    /// Uitgebreid (alle velden, P&L uit prijzen) of snel (alleen resultaat,
+    /// symbool en confluences).
+    public enum EntryStyle: String, CaseIterable, Identifiable {
+        case detailed
+        case quick
+
+        public var id: String { rawValue }
+
+        public var displayName: String {
+            switch self {
+            case .detailed: return "Uitgebreid"
+            case .quick: return "Snel"
+            }
+        }
+    }
+
     public enum Mode {
         case create
         case edit(Trade)
@@ -26,6 +42,13 @@ public final class TradeFormViewModel {
     /// niet opgeslagen zijn. Worden bij `save(in:)` als `TradeScreenshot`
     /// aangemaakt.
     public var pendingScreenshots: [Data] = []
+
+    /// Standaard uitgebreid; een bestaande snelle trade opent in "Snel".
+    public var entryStyle: EntryStyle = .detailed
+
+    /// Snelle invoer: winst (`true`) of verlies, en het bedrag (≥ 0).
+    public var quickIsProfit: Bool = true
+    public var quickAmount: Double = 0
 
     public let mode: Mode
     private let editingService: TradeEditingService
@@ -50,6 +73,11 @@ public final class TradeFormViewModel {
             }
         case .edit(let trade):
             self.values = editingService.values(from: trade)
+            if let manual = trade.manualNetPnL {
+                entryStyle = .quick
+                quickIsProfit = manual >= 0
+                quickAmount = abs(manual)
+            }
         }
     }
 
@@ -68,11 +96,48 @@ public final class TradeFormViewModel {
 
     public var title: String { mode.isEditing ? "Trade bewerken" : "Nieuwe trade" }
 
-    public var isValid: Bool {
-        !values.symbol.trimmingCharacters(in: .whitespaces).isEmpty
-            && values.quantity > 0
-            && values.tickSize > 0
-            && values.entryPrice != 0
+    public var isValid: Bool { missingFields.isEmpty }
+
+    /// Wat er nog ontbreekt om te kunnen opslaan — getoond in het formulier,
+    /// zodat een uitgeschakelde "Opslaan"-knop niet raadselachtig is.
+    ///
+    /// Alleen het symbool is echt verplicht: een trade mag ook zonder prijzen
+    /// (snel iets vastleggen). Wel: een exit-prijs zonder entry-prijs zou een
+    /// absurde P&L opleveren, dus dan is de entry-prijs verplicht.
+    public var missingFields: [String] {
+        var missing: [String] = []
+        if values.symbol.trimmingCharacters(in: .whitespaces).isEmpty { missing.append("Symbool (of kies een preset)") }
+        // Snel: alleen het symbool; een bedrag van 0 is breakeven.
+        guard entryStyle == .detailed else { return missing }
+        if values.entryPrice == 0, let exit = values.exitPrice, exit != 0 {
+            missing.append("Entry-prijs (nodig als je een exit-prijs invult)")
+        }
+        if values.quantity <= 0 { missing.append("Aantal contracten/lots groter dan 0") }
+        if values.tickSize <= 0 { missing.append("Tick size groter dan 0") }
+        return missing
+    }
+
+    /// Trade zonder prijzen: wordt opgeslagen maar telt niet mee in P&L en
+    /// win rate (geen exit-prijs → geen resultaat).
+    public var hasNoPrices: Bool {
+        entryStyle == .detailed && values.entryPrice == 0 && (values.exitPrice ?? 0) == 0
+    }
+
+    /// Netto resultaat zoals de snelle invoer het opslaat.
+    public var quickNetPnL: Double {
+        quickIsProfit ? abs(quickAmount) : -abs(quickAmount)
+    }
+
+    /// Zet `manualNetPnL` volgens de gekozen stijl. Snel: resultaat handmatig
+    /// en de trade telt als gesloten; uitgebreid: P&L weer uit de prijzen.
+    private func applyEntryStyle() {
+        switch entryStyle {
+        case .quick:
+            values.manualNetPnL = quickNetPnL
+            if values.exitDate == nil { values.exitDate = values.entryDate }
+        case .detailed:
+            values.manualNetPnL = nil
+        }
     }
 
     /// Screenshots die al bij de trade horen (alleen relevant bij bewerken).
@@ -97,7 +162,8 @@ public final class TradeFormViewModel {
             commission: values.commission,
             fees: values.fees,
             tickSize: values.tickSize,
-            tickValue: values.tickValue
+            tickValue: values.tickValue,
+            manualNetPnL: entryStyle == .quick ? quickNetPnL : nil
         )
         return statsService.metrics(for: transient)
     }
@@ -193,6 +259,11 @@ public final class TradeFormViewModel {
     /// bestaande bij, en voegt eventuele nieuwe screenshots toe.
     @discardableResult
     public func save(in context: ModelContext) -> Trade {
+        // Zonder prijzen geen exit-prijs van 0 opslaan: dat zou als breakeven
+        // meetellen in de win rate. Zonder exit-prijs telt de trade niet mee.
+        if hasNoPrices { values.exitPrice = nil }
+        applyEntryStyle()
+
         let trade: Trade
         switch mode {
         case .create:
