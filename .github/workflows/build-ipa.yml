@@ -7,9 +7,80 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Unit tests
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode & Swift versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Pick an iOS simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 - <<'PY'
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          # Sort iOS runtimes newest first, pick the first available iPhone.
+          runtimes = sorted(
+              (rt for rt in data if "SimRuntime.iOS-" in rt),
+              key=lambda rt: [int(p) for p in rt.split("iOS-", 1)[1].split("-")],
+              reverse=True,
+          )
+          for rt in runtimes:
+              for dev in data[rt]:
+                  if dev.get("isAvailable") and dev.get("name", "").startswith("iPhone"):
+                      print(dev["udid"])
+                      sys.exit(0)
+          sys.exit("No available iPhone simulator found")
+          PY
+          )
+          echo "Using simulator UDID: $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project TradeJournal.xcodeproj \
+            -scheme TradeJournal \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Upload xcresult on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeJournal-test-results
+          path: TestResults.xcresult
+          if-no-files-found: warn
+          retention-days: 14
+
   build:
     name: Build TradeJournal.ipa
     runs-on: macos-15
+    needs: test
     timeout-minutes: 30
 
     steps:
