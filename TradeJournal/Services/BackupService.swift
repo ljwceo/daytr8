@@ -338,6 +338,7 @@ public struct BackupService {
                 emotionBefore: dto.emotionBefore, emotionAfter: dto.emotionAfter,
                 rating: dto.rating, notes: dto.notes, isBacktest: dto.isBacktest,
                 session: Session(rawValue: dto.session) ?? .other,
+                manualNetPnL: dto.manualNetPnL,
                 createdAt: dto.createdAt, updatedAt: dto.updatedAt
             )
             context.insert(trade)
@@ -480,7 +481,8 @@ public struct BackupService {
             mistakeIDs: trade.mistakes.map(\.id),
             executions: executions,
             ruleAdherence: adherence,
-            screenshots: screenshots
+            screenshots: screenshots,
+            manualNetPnL: trade.manualNetPnL
         )
     }
 

@@ -97,6 +97,11 @@ public final class Trade {
     /// Notities in markdown/plain text.
     public var notes: String = ""
 
+    /// Handmatig ingevoerd netto resultaat ("snelle invoer" in het formulier).
+    /// Als dit gezet is en de trade geen executions heeft, gebruikt
+    /// `StatsService` deze waarde in plaats van de prijsberekening.
+    public var manualNetPnL: Double? = nil
+
     /// Vlag: is dit een backtest-trade? (Redundant met account.type maar handig voor snelfilters.)
     public var isBacktest: Bool = false
 
@@ -161,6 +166,7 @@ public final class Trade {
         account: Account? = nil,
         instrument: Instrument? = nil,
         playbook: Playbook? = nil,
+        manualNetPnL: Double? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -190,6 +196,7 @@ public final class Trade {
         self.account = account
         self.instrument = instrument
         self.playbook = playbook
+        self.manualNetPnL = manualNetPnL
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

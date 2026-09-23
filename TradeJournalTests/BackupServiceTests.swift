@@ -266,7 +266,7 @@ final class BackupServiceTests: XCTestCase {
 
         let url = try service.exportBackup(from: context, to: directory)
         let loaded = try service.loadBackup(at: url)
-        XCTAssertEqual(loaded.summary.formatVersion, 2)
+        XCTAssertEqual(loaded.summary.formatVersion, BackupPayload.currentFormatVersion)
         try service.restore(loaded, into: context)
 
         let templates = try context.fetch(FetchDescriptor<JournalTemplate>())
@@ -317,5 +317,18 @@ final class BackupServiceTests: XCTestCase {
         try service.restore(loaded, into: context)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<Trade>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<DailyRule>()), 0)
+    }
+
+    func test_roundTrip_keepsManualNetPnL() throws {
+        let quick = Trade(symbol: "ES", direction: .short, entryDate: Date(timeIntervalSince1970: 1_790_000_000),
+                          exitDate: Date(timeIntervalSince1970: 1_790_000_000), entryPrice: 0, quantity: 1, manualNetPnL: -125.5)
+        context.insert(quick)
+        try context.save()
+
+        let loaded = try service.loadBackup(at: try service.exportBackup(from: context, to: directory))
+        try service.restore(loaded, into: context)
+
+        let restored = try XCTUnwrap(try context.fetch(FetchDescriptor<Trade>()).first { $0.id == quick.id })
+        XCTAssertEqual(restored.manualNetPnL, -125.5)
     }
 }

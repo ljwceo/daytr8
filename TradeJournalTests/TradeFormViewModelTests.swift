@@ -187,4 +187,53 @@ final class TradeFormViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.values.quantity, 2)
         XCTAssertEqual(viewModel.values.entryPrice, 0, "Nieuwe trade begint zonder resultaat-specifieke prijzen")
     }
+
+    // MARK: - Snelle invoer
+
+    func test_quickEntry_onlySymbolRequired_andSavesManualPnL() throws {
+        let container = try ModelContainer(for: Schema(AppSchema.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+        let context = container.mainContext
+        let viewModel = TradeFormViewModel(mode: .create)
+        XCTAssertEqual(viewModel.entryStyle, .detailed, "Standaard uitgebreid")
+
+        viewModel.entryStyle = .quick
+        viewModel.values.symbol = ""
+        XCTAssertEqual(viewModel.missingFields, ["Symbool (of kies een preset)"])
+
+        viewModel.values.symbol = "NQ"
+        viewModel.quickIsProfit = false
+        viewModel.quickAmount = 250
+        XCTAssertTrue(viewModel.isValid)
+        XCTAssertEqual(viewModel.livePreview.netPnL, -250, accuracy: 0.001)
+
+        let trade = viewModel.save(in: context)
+        XCTAssertEqual(trade.manualNetPnL, -250)
+        XCTAssertNotNil(trade.exitDate, "Snelle trade telt als gesloten")
+        let metrics = StatsService().metrics(for: trade)
+        XCTAssertEqual(metrics.netPnL, -250, accuracy: 0.001)
+        XCTAssertEqual(metrics.outcome, .loss)
+
+        // Bewerken opent weer in "Snel" met hetzelfde resultaat.
+        let edit = TradeFormViewModel(mode: .edit(trade))
+        XCTAssertEqual(edit.entryStyle, .quick)
+        XCTAssertFalse(edit.quickIsProfit)
+        XCTAssertEqual(edit.quickAmount, 250)
+    }
+
+    func test_detailedEntry_clearsManualPnL() throws {
+        let container = try ModelContainer(for: Schema(AppSchema.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+        let context = container.mainContext
+        let trade = Trade(symbol: "NQ", direction: .long, entryDate: Date(), exitDate: Date(), entryPrice: 0, quantity: 1, manualNetPnL: 100)
+        context.insert(trade)
+
+        let viewModel = TradeFormViewModel(mode: .edit(trade))
+        viewModel.entryStyle = .detailed
+        viewModel.values.entryPrice = 18_000
+        viewModel.values.exitPrice = 18_010
+        viewModel.values.tickSize = 0.25
+        viewModel.values.tickValue = 5
+        viewModel.save(in: context)
+        XCTAssertNil(trade.manualNetPnL)
+        XCTAssertEqual(StatsService().metrics(for: trade).netPnL, 200, accuracy: 0.001)
+    }
 }

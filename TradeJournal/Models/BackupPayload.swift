@@ -16,7 +16,9 @@ public struct BackupPayload: Codable, Equatable {
     /// - 2: fase 6 — journal-templates, dagelijkse regels (+ afvinkstatus) en
     ///   notebook-notities. Deze velden zijn optioneel, zodat een versie
     ///   1-backup gewoon blijft inlezen.
-    public static let currentFormatVersion = 2
+    /// - 3: `TradeDTO.manualNetPnL` (snelle invoer). Een oudere app weigert
+    ///   zo'n backup i.p.v. het resultaat van snelle trades stil te negeren.
+    public static let currentFormatVersion = 3
 
     public var formatVersion: Int
     public var exportedAt: Date
@@ -174,6 +176,8 @@ public struct BackupPayload: Codable, Equatable {
         public var executions: [ExecutionDTO]
         public var ruleAdherence: [RuleAdherenceDTO]
         public var screenshots: [ScreenshotDTO]
+        /// Sinds formaatversie 3.
+        public var manualNetPnL: Double? = nil
     }
 
     public struct DailyJournalDTO: Codable, Equatable {

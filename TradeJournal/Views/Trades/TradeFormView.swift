@@ -34,6 +34,7 @@ struct TradeFormView: View {
     var body: some View {
         NavigationStack {
             Form {
+                entryStylePicker
                 previewCard
                 if !viewModel.missingFields.isEmpty {
                     missingFieldsSection
@@ -44,16 +45,20 @@ struct TradeFormView: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
-                accountSection
-                instrumentSection
-                timingSection
-                pricesSection
-                costsSection
-                playbookSection
-                confluencesSection
-                tagsAndMistakesSection
-                reflectionSection
-                screenshotsSection
+                if viewModel.entryStyle == .quick {
+                    quickSections
+                } else {
+                    accountSection
+                    instrumentSection
+                    timingSection
+                    pricesSection
+                    costsSection
+                    playbookSection
+                    confluencesSection
+                    tagsAndMistakesSection
+                    reflectionSection
+                    screenshotsSection
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
@@ -111,6 +116,60 @@ struct TradeFormView: View {
                 .foregroundStyle(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Uitgebreid / snel
+
+    private var entryStylePicker: some View {
+        Picker("Invoer", selection: $viewModel.entryStyle) {
+            ForEach(TradeFormViewModel.EntryStyle.allCases) { style in
+                Text(style.displayName).tag(style)
+            }
+        }
+        .pickerStyle(.segmented)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+    }
+
+    /// Snelle invoer: account, symbool, richting/datum, winst of verlies en
+    /// confluences (plus optioneel een notitie).
+    @ViewBuilder
+    private var quickSections: some View {
+        accountSection
+
+        Section("Instrument") {
+            Picker("Preset", selection: presetBinding) {
+                Text("Handmatig").tag(Optional<Instrument>.none)
+                ForEach(instruments) { instrument in
+                    Text("\(instrument.symbol) — \(instrument.name)").tag(Optional(instrument))
+                }
+            }
+            TextField("Symbool", text: $viewModel.values.symbol)
+                .textInputAutocapitalization(.characters)
+        }
+
+        Section("Resultaat") {
+            Picker("Resultaat", selection: $viewModel.quickIsProfit) {
+                Text("Winst").tag(true)
+                Text("Verlies").tag(false)
+            }
+            .pickerStyle(.segmented)
+            numberRow("Bedrag ($)", value: $viewModel.quickAmount)
+            Picker("Richting", selection: $viewModel.values.direction) {
+                ForEach(TradeDirection.allCases) { direction in
+                    Text(direction.displayName).tag(direction)
+                }
+            }
+            .pickerStyle(.segmented)
+            DatePicker("Datum", selection: $viewModel.values.entryDate)
+        }
+
+        confluencesSection
+
+        Section("Notitie") {
+            TextField("Optioneel", text: $viewModel.values.notes, axis: .vertical)
+                .lineLimit(2...6)
+        }
     }
 
     // MARK: - Secties

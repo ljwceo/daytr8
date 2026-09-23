@@ -148,6 +148,12 @@ public struct StatsService: Sendable {
     private func grossAndFees(for trade: Trade) -> (gross: Double, commission: Double, fees: Double, isClosed: Bool) {
         let direction = trade.direction
 
+        // Snelle invoer: het netto resultaat is handmatig ingevuld. Bruto zo
+        // kiezen dat bruto − kosten precies het ingevulde netto oplevert.
+        if trade.executions.isEmpty, let manual = trade.manualNetPnL {
+            return (manual + trade.commission + trade.fees, 0, 0, true)
+        }
+
         if !trade.executions.isEmpty {
             // Sommeer per fill: teken van signedQuantity bepaalt entry/exit.
             // Bruto P&L = -Σ(signedQuantity × price) mits netto positie = 0
