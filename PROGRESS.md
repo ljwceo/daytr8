@@ -862,10 +862,8 @@ screenshots (geen ruwe Vision-uitvoer beschikbaar):
 
 ### Openstaande punten
 
-- Aanname: Vision leest de pijl als `→` (of `->`, `➝`, `>`). In de ingeklapte
-  lijst is dat het enige herkenningsteken; leest Vision hem anders, dan wordt
-  MetaTrader daar niet herkend. De opengeklapte weergave heeft ook `S/L`,
-  `T/P` en `Swap`. Nog te bevestigen op het toestel met de IPA van deze branch.
+- ~~Aanname: Vision leest de pijl als `→`~~ — bevestigd op het toestel: de
+  ingeklapte lijst en de opengeklapte trade worden als MetaTrader herkend.
 - Meerdere trades op één screenshot: de eerste is het voorstel, de rest komt
   als alternatieven per veld (niet per trade gekoppeld). Eén trade per
   screenshot (of opengeklapt) geeft het beste resultaat.
@@ -901,6 +899,10 @@ wijkt het af, omdat MT5 in de valuta van het account (EUR) rekent.
   prijzen × tick value; zet voor NAS100 een instrument met de juiste tick
   value (MT5: meestal tick size 0.01, tick value 0.01) — het valutaverschil
   (EUR-account) blijft dan klein maar bestaat.
+- Op het toestel getest (IPA van main na #18): opengeklapte MT5-trade geeft
+  Netto P&L 1 450,14, prijzen volledig (27371,55 / 27405,48) en met een
+  NAS100-instrument (tick size 0.01, tick value 0.01) een kloppende R.
+  MetaTrader 5 (iOS) is daarmee afgerond.
 
 ## Volgende fase
 
