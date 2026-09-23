@@ -19,6 +19,11 @@ public enum AppSchema {
         DailyJournal.self,
         DailyJournalScreenshot.self,
         Tag.self,
-        Mistake.self
+        Mistake.self,
+        // Fase 6: templates, progress tracker en notebook (SPEC §10).
+        JournalTemplate.self,
+        DailyRule.self,
+        DailyRuleCheck.self,
+        NotebookNote.self
     ]
 }

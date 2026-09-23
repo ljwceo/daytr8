@@ -15,6 +15,14 @@ public final class CalendarViewModel {
 
     public let calendar: Calendar
 
+    /// `@AppStorage`-sleutel: backtest-trades in kalender en dagdetail tonen.
+    public static let includeBacktestKey = "calendar.includeBacktest"
+
+    /// Trades die de kalender toont: zonder backtest-trades, tenzij expliciet aangezet.
+    public static func visibleTrades(_ trades: [Trade], includeBacktest: Bool) -> [Trade] {
+        includeBacktest ? trades : trades.filter(\.countsInLiveStats)
+    }
+
     public init(calendar: Calendar = .current, referenceDate: Date = Date()) {
         self.calendar = calendar
         self.displayedMonth = Self.startOfMonth(for: referenceDate, calendar: calendar)

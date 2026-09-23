@@ -20,11 +20,29 @@ struct TradeDetailView: View {
     @State private var confirmDelete = false
     @State private var showingViewer = false
     @State private var viewerStartIndex = 0
+    @State private var noteTarget: NoteEditorTarget?
+    @State private var notebookViewModel = NotebookViewModel()
 
     private var metrics: TradeMetrics { statsService.metrics(for: trade) }
     private var currency: String { trade.account?.currency ?? "USD" }
 
     var body: some View {
+        // Een trade die intussen gewist is (bijv. via "Alles wissen" of een
+        // restore terwijl dit scherm in een andere tab openstond) mag niet
+        // meer uitgelezen worden — dat crasht SwiftData.
+        if trade.isDeleted || trade.modelContext == nil {
+            ContentUnavailableView(
+                "Trade verwijderd",
+                systemImage: "trash",
+                description: Text("Deze trade bestaat niet meer.")
+            )
+            .background(Theme.background)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             ScrollView {
@@ -36,6 +54,7 @@ struct TradeDetailView: View {
                     if !trade.tags.isEmpty || !trade.mistakes.isEmpty { tagsAndMistakesCard }
                     if hasReflectionContent { reflectionCard }
                     if !trade.screenshots.isEmpty { screenshotsCard }
+                    notesCard
                 }
                 .padding(16)
             }
@@ -69,6 +88,9 @@ struct TradeDetailView: View {
         }
         .sheet(isPresented: $showingEdit) {
             TradeFormView(mode: .edit(trade))
+        }
+        .sheet(item: $noteTarget) { target in
+            NoteEditorView(note: target.note, linkedDate: target.linkedDate, linkedTrade: target.linkedTrade)
         }
         .fullScreenCover(isPresented: $showingViewer) {
             ScreenshotViewerView(
@@ -240,6 +262,26 @@ struct TradeDetailView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Notebook-notities gekoppeld aan deze trade.
+    private var notesCard: some View {
+        card(title: "Notebook") {
+            ForEach(notebookViewModel.notes(for: trade)) { note in
+                Button {
+                    noteTarget = NoteEditorTarget(note: note)
+                } label: {
+                    NoteRowView(note: note)
+                }
+                .buttonStyle(.plain)
+            }
+            Button {
+                noteTarget = NoteEditorTarget(note: nil, linkedTrade: trade)
+            } label: {
+                Label("Notitie of les toevoegen", systemImage: "square.and.pencil")
+                    .font(.subheadline.weight(.medium))
             }
         }
     }

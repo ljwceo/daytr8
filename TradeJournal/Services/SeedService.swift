@@ -18,6 +18,8 @@ public enum SeedService {
     public static func seedDefaultsIfNeeded(in context: ModelContext) {
         seedInstrumentPresetsIfNeeded(in: context)
         seedConfluencesIfNeeded(in: context)
+        seedJournalTemplatesIfNeeded(in: context)
+        seedDailyRulesIfNeeded(in: context)
 
         do {
             try context.save()
@@ -72,6 +74,37 @@ public enum SeedService {
                 sortOrder: def.sortOrder
             )
             context.insert(conf)
+        }
+    }
+
+    // MARK: - Journal-templates
+
+    /// Schiet de standaard pre-/post-market-template in voor elke soort
+    /// waarvan nog geen enkele template bestaat. Bewerkte templates worden dus
+    /// nooit overschreven.
+    public static func seedJournalTemplatesIfNeeded(in context: ModelContext) {
+        let existingKinds = Set(fetchAll(JournalTemplate.self, in: context).map(\.kind))
+        for (index, def) in JournalTemplateService.defaults.enumerated() where !existingKinds.contains(def.kind) {
+            context.insert(JournalTemplate(kind: def.kind, name: def.name, body: def.body, isDefault: true, isBuiltIn: true, sortOrder: index))
+        }
+    }
+
+    // MARK: - Dagelijkse regels
+
+    /// Standaardregels voor de progress tracker (SPEC §10).
+    public static let defaultDailyRules: [(name: String, kind: DailyRuleKind, threshold: Double)] = [
+        ("Max 3 trades", .maxTrades, 3),
+        ("Stop na 2 verliezen", .stopAfterLosses, 2),
+        ("Journal ingevuld", .journalFilled, 0),
+        ("Alleen setups uit mijn playbook", .manual, 0)
+    ]
+
+    /// Schiet de standaardregels in zolang er nog geen enkele regel bestaat.
+    /// Regels die de gebruiker niet wil kan hij deactiveren of verwijderen.
+    public static func seedDailyRulesIfNeeded(in context: ModelContext, now: Date = Date()) {
+        guard fetchAll(DailyRule.self, in: context).isEmpty else { return }
+        for (index, def) in defaultDailyRules.enumerated() {
+            context.insert(DailyRule(name: def.name, kind: def.kind, threshold: def.threshold, sortOrder: index, createdAt: now))
         }
     }
 

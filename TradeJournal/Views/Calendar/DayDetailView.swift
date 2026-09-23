@@ -12,9 +12,16 @@ struct DayDetailView: View {
     @Query(sort: \Trade.entryDate, order: .reverse) private var allTrades: [Trade]
     @Query(sort: \DailyJournal.date) private var allJournals: [DailyJournal]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
+    @Query(sort: \JournalTemplate.sortOrder) private var templates: [JournalTemplate]
+    @Query(sort: \DailyRule.sortOrder) private var rules: [DailyRule]
+    @Query private var ruleChecks: [DailyRuleCheck]
+    @Query(sort: \NotebookNote.updatedAt, order: .reverse) private var notes: [NotebookNote]
 
     @State private var viewModel: DayDetailViewModel
+    @State private var progressViewModel = ProgressTrackerViewModel()
+    @State private var notebookViewModel = NotebookViewModel()
     @State private var showingNewTrade = false
+    @State private var noteTarget: NoteEditorTarget?
 
     private let calendar = Calendar.current
     private let statsService = StatsService()
@@ -24,8 +31,10 @@ struct DayDetailView: View {
         _viewModel = State(initialValue: DayDetailViewModel(date: date, journal: nil))
     }
 
+    @AppStorage(CalendarViewModel.includeBacktestKey) private var includeBacktest = false
+
     private var dayTrades: [Trade] {
-        viewModel.trades(from: allTrades, calendar: calendar)
+        viewModel.trades(from: CalendarViewModel.visibleTrades(allTrades, includeBacktest: includeBacktest), calendar: calendar)
     }
 
     private var existingJournal: DailyJournal? {
@@ -49,6 +58,8 @@ struct DayDetailView: View {
 
                     tradesCard
                     journalCard
+                    rulesCard
+                    notesCard
                 }
                 .padding(16)
             }
@@ -68,6 +79,9 @@ struct DayDetailView: View {
         }
         .navigationDestination(for: Trade.self) { trade in
             TradeDetailView(trade: trade)
+        }
+        .sheet(item: $noteTarget) { target in
+            NoteEditorView(note: target.note, linkedDate: target.linkedDate, linkedTrade: target.linkedTrade)
         }
         .sheet(isPresented: $showingNewTrade) {
             TradeFormView(mode: .create, lastTrade: allTrades.first, fallbackAccount: accounts.first, initialDate: date)
@@ -117,6 +131,7 @@ struct DayDetailView: View {
     private var journalCard: some View {
         card(title: "Dagjournal") {
             VStack(alignment: .leading, spacing: 12) {
+                templateMenu
                 labeledField("Pre-market plan", text: $viewModel.journalDraft.preMarketPlan)
                 labeledField("Dagelijkse bias", text: $viewModel.journalDraft.dailyBias)
                 labeledField("Nieuws & events", text: $viewModel.journalDraft.newsAndEvents)
@@ -137,6 +152,63 @@ struct DayDetailView: View {
                 .background(Theme.accent)
                 .foregroundStyle(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))
+            }
+        }
+    }
+
+    /// Menu om een pre-/post-market-template in het concept te zetten.
+    @ViewBuilder
+    private var templateMenu: some View {
+        if !templates.isEmpty {
+            Menu {
+                ForEach(JournalTemplateKind.allCases) { kind in
+                    Section(kind.displayName) {
+                        ForEach(viewModel.templateService.sorted(templates.filter { $0.kind == kind })) { template in
+                            Button(template.name.isEmpty ? kind.displayName : template.name) {
+                                viewModel.applyTemplate(template)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Template invoegen", systemImage: "doc.text")
+                    .font(.subheadline.weight(.medium))
+            }
+        }
+    }
+
+    private var rulesCard: some View {
+        let progress = progressViewModel.dayProgress(
+            for: date,
+            rules: rules,
+            trades: CalendarViewModel.visibleTrades(allTrades, includeBacktest: false),
+            journals: allJournals,
+            checks: ruleChecks
+        )
+        return card(title: "Dagelijkse regels") {
+            RuleChecklistView(progress: progress) { ruleID in
+                guard let rule = rules.first(where: { $0.id == ruleID }) else { return }
+                progressViewModel.toggleCheck(for: rule, on: date, in: modelContext)
+            }
+        }
+    }
+
+    private var notesCard: some View {
+        let dayNotes = notebookViewModel.notes(linkedTo: date, from: notes)
+        return card(title: "Notities") {
+            ForEach(dayNotes) { note in
+                Button {
+                    noteTarget = NoteEditorTarget(note: note)
+                } label: {
+                    NoteRowView(note: note)
+                }
+                .buttonStyle(.plain)
+            }
+            Button {
+                noteTarget = NoteEditorTarget(note: nil, linkedDate: date)
+            } label: {
+                Label("Notitie toevoegen", systemImage: "square.and.pencil")
+                    .font(.subheadline.weight(.medium))
             }
         }
     }

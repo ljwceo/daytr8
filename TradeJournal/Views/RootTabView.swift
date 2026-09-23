@@ -37,5 +37,6 @@ struct RootTabView: View {
 
 #Preview {
     RootTabView()
+        .environment(AppLockViewModel())
         .preferredColorScheme(.dark)
 }

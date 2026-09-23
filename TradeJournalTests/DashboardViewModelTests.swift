@@ -195,4 +195,33 @@ final class DashboardViewModelTests: XCTestCase {
         let recent = viewModel.recentTrades(from: [t1, t2, t3], limit: 2)
         XCTAssertEqual(recent.map(\.id), [t3.id, t2.id])
     }
+
+    // MARK: - Backtest-modus (fase 6)
+
+    func test_filteredTrades_excludesBacktestByDefault() {
+        let live = Account(name: "Live", type: .live, startingBalance: 1000)
+        let backtest = Account(name: "BT", type: .backtest, startingBalance: 1000)
+        context.insert(live)
+        context.insert(backtest)
+        let now = Date()
+        let liveTrade = makeTrade(account: live, entryDate: now)
+        let flagged = makeTrade(account: live, entryDate: now)
+        flagged.isBacktest = true
+        let backtestTrade = makeTrade(account: backtest, entryDate: now)
+        let all = [liveTrade, flagged, backtestTrade]
+
+        XCTAssertEqual(viewModel.filteredTrades(all).map(\.id), [liveTrade.id])
+
+        viewModel.includeBacktest = true
+        XCTAssertEqual(Set(viewModel.filteredTrades(all).map(\.id)), Set(all.map(\.id)))
+    }
+
+    func test_filteredTrades_selectedBacktestAccount_isShown() {
+        let backtest = Account(name: "BT", type: .backtest, startingBalance: 1000)
+        context.insert(backtest)
+        let trade = makeTrade(account: backtest, entryDate: Date())
+
+        viewModel.toggleAccount(backtest)
+        XCTAssertEqual(viewModel.filteredTrades([trade]).map(\.id), [trade.id])
+    }
 }

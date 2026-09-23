@@ -36,12 +36,32 @@ public final class DayDetailViewModel {
 
     public let date: Date
     public let statsService: StatsService
+    public let templateService: JournalTemplateService
     public var journalDraft: JournalDraft
 
-    public init(date: Date, journal: DailyJournal?, statsService: StatsService = StatsService()) {
+    public init(
+        date: Date,
+        journal: DailyJournal?,
+        statsService: StatsService = StatsService(),
+        templateService: JournalTemplateService = JournalTemplateService()
+    ) {
         self.date = date
         self.journalDraft = JournalDraft(from: journal)
         self.statsService = statsService
+        self.templateService = templateService
+    }
+
+    // MARK: - Templates
+
+    /// Zet `template` in het bijbehorende veld van het concept (pre-market
+    /// plan of post-market review), zonder bestaande tekst te overschrijven.
+    public func applyTemplate(_ template: JournalTemplate) {
+        switch template.kind {
+        case .preMarket:
+            journalDraft.preMarketPlan = templateService.apply(template.body, to: journalDraft.preMarketPlan, date: date)
+        case .postMarket:
+            journalDraft.postMarketReview = templateService.apply(template.body, to: journalDraft.postMarketReview, date: date)
+        }
     }
 
     public func resetDraft(from journal: DailyJournal?) {
