@@ -969,6 +969,33 @@ alleen zoekresultaten waren beschikbaar. Bevindingen:
   tabellen) zijn niet getest. Bij de eerste echte screenshot per platform
   de koppen/fixtures bijstellen.
 
+## Confluences beheren (fix na test op toestel)
+
+Op het toestel bleek dat eigen confluences niet aan te maken waren: er was
+geen scherm om confluences toe te voegen, te bewerken of te verwijderen
+(SPEC.md §3/§4: naam, categorie, kleur, icoon, actief/gearchiveerd).
+
+- `ViewModels/ConfluenceSettingsViewModel.swift` (nieuw) — `Draft`,
+  naamvalidatie (niet leeg, uniek hoofdletterongevoelig), opslaan (nieuw
+  achteraan de categorie; bij categoriewissel ook), archiveren/activeren,
+  verwijderen, slepen binnen een categorie, standaardset terugzetten.
+  Vaste kleur- en icoonkeuzes.
+- `Views/More/ConfluencesView.swift` (nieuw) — lijst per categorie met
+  aantal trades, `+` voor nieuw, tik = bewerken (naam, categorie, kleur,
+  icoon, omschrijving, actief, voorbeeldchip), vegen = archiveren of
+  verwijderen (bevestiging met het aantal trades; archiveren als
+  alternatief), Wijzig = sorteren, knop "Standaardset terugzetten".
+- `Views/More/MoreView.swift` — sectie "Trading" → Confluences.
+- `Services/SeedService.swift` — `seedConfluencesIfNeeded` schiet de
+  standaardset alleen nog in als er geen enkele confluence is (anders kwam
+  een verwijderde standaardconfluence bij elke start terug);
+  `restoreDefaultConfluences` voegt ontbrekende standaardconfluences toe.
+- Tests: `ConfluenceSettingsViewModelTests` (toevoegen, dubbele/lege naam,
+  bewerken incl. standaard, verwijderen + niet terug na seed + terugzetten,
+  archiveren, sorteren).
+- Geen wijziging aan SwiftData-schema of backupformaat (confluences zaten al
+  in de backup).
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
