@@ -48,7 +48,7 @@ final class CalendarAggregationServiceTests: XCTestCase {
         var comps = DateComponents(year: 2026, month: 3, day: 10, hour: 9)
         comps.timeZone = calendar.timeZone
         let entry = calendar.date(from: comps)!
-        let exitComps = DateComponents(year: 2026, month: 3, day: 11, hour: 2, timeZone: calendar.timeZone)
+        let exitComps = DateComponents(timeZone: calendar.timeZone, year: 2026, month: 3, day: 11, hour: 2)
         let exit = calendar.date(from: exitComps)!
 
         let trade = makeTrade(entryDate: entry, exitDate: exit, entry: 18_000, exit: 18_010)
