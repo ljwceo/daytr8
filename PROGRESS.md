@@ -956,6 +956,14 @@ alleen zoekresultaten waren beschikbaar. Bevindingen:
 - Tests: tabelfixtures per platform (ook TopstepX zonder logo), een test
   met losse Vision-blokken (samengevoegde koppen, tijd breder dan kop) en
   een formuliertest voor het kiezen van een trade.
+- `ScreenshotVisionTableTests` — end-to-end met **echte Apple Vision-OCR**
+  in CI: de tabellen worden als afbeelding getekend, door
+  `VisionTextRecognizer` gelezen en geparst. Tradovate en TopstepX komen er
+  volledig uit. Bevinding: Vision slaat losse cellen met één cijfer over
+  (NinjaTrader Qty "1"); het formulier rekent het aantal dan terug uit
+  Profit, entry en exit (tick size/value van het instrument), ook getest.
+  Echte screenshots van deze platforms waren vanuit de cloudomgeving niet
+  op te halen (netwerkbeleid).
 - Openstaand: de kolomkoppen komen uit documentatie, niet uit echte
   screenshots; mobiele weergaven van Tradovate/TopstepX (kaarten i.p.v.
   tabellen) zijn niet getest. Bij de eerste echte screenshot per platform
