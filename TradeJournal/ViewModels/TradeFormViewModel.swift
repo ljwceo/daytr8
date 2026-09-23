@@ -50,9 +50,38 @@ public final class TradeFormViewModel {
     public var quickIsProfit: Bool = true
     public var quickAmount: Double = 0
 
+    // MARK: Screenshot-import (OCR)
+
+    /// Hoe een veld door de screenshot-import is ingevuld.
+    public enum OCRFieldOrigin: Equatable {
+        /// Letterlijk van de screenshot gelezen.
+        case recognized
+        /// Berekend uit andere gelezen waarden (bijv. exit uit P&L).
+        case derived
+    }
+
+    /// Eén keuze in de chip-rij met alternatieven van een veld.
+    public struct OCRCandidate: Identifiable, Equatable {
+        public let id: Int
+        public let label: String
+        public let isSelected: Bool
+    }
+
+    /// Velden die de screenshot-import heeft ingevuld (voor het "uit OCR"-icoon).
+    public private(set) var ocrOrigins: [ScreenshotField: OCRFieldOrigin] = [:]
+    /// Laatste parse-resultaat (bron van de alternatieven).
+    public private(set) var ocrResult: ScreenshotParseResult?
+    /// Melding na een import (succes, niets gevonden of fout).
+    public var ocrMessage: String?
+    public private(set) var isRecognizingScreenshot = false
+
     public let mode: Mode
     private let editingService: TradeEditingService
     private let statsService: StatsService
+    private let textRecognizer: any ScreenshotTextRecognizing
+    private let screenshotTemplates: [ScreenshotTemplate]
+    /// Instrumenten van de laatste import, voor het wisselen van symbool-kandidaat.
+    private var ocrInstruments: [Instrument] = []
 
     public init(
         mode: Mode,
@@ -60,11 +89,15 @@ public final class TradeFormViewModel {
         fallbackAccount: Account? = nil,
         initialDate: Date? = nil,
         editingService: TradeEditingService = TradeEditingService(),
-        statsService: StatsService = StatsService()
+        statsService: StatsService = StatsService(),
+        textRecognizer: any ScreenshotTextRecognizing = VisionTextRecognizer(),
+        screenshotTemplates: [ScreenshotTemplate] = ScreenshotTemplateStore.bundled
     ) {
         self.mode = mode
         self.editingService = editingService
         self.statsService = statsService
+        self.textRecognizer = textRecognizer
+        self.screenshotTemplates = screenshotTemplates
         switch mode {
         case .create:
             self.values = .makeDefault(basedOn: lastTrade, fallbackAccount: fallbackAccount)
@@ -253,6 +286,305 @@ public final class TradeFormViewModel {
     public func removeExistingScreenshot(_ screenshot: TradeScreenshot, in context: ModelContext) {
         guard case .edit(let trade) = mode else { return }
         editingService.removeScreenshot(screenshot, from: trade, in: context)
+    }
+
+    // MARK: - Screenshot-import (OCR)
+
+    /// "Vul in vanuit screenshot": koppelt de screenshot als bijlage, leest de
+    /// tekst on-device (Vision) en vult de herkende velden in. Faalt de OCR of
+    /// wordt niets herkend, dan blijft het formulier zoals het was (met de
+    /// screenshot al bijgevoegd) en staat er een melding in `ocrMessage`.
+    @MainActor
+    public func importScreenshot(_ data: Data, instruments: [Instrument]) async {
+        addPendingScreenshot(data)
+        isRecognizingScreenshot = true
+        defer { isRecognizingScreenshot = false }
+        do {
+            let lines = try await textRecognizer.recognizeLines(in: data)
+            let parser = ScreenshotParser(
+                templates: screenshotTemplates,
+                knownSymbols: CSVImportService.knownSymbols(instruments: instruments)
+            )
+            applyScreenshotResult(parser.parse(lines: lines, referenceDate: values.entryDate), instruments: instruments)
+        } catch {
+            ocrResult = nil
+            ocrOrigins = [:]
+            ocrMessage = "De tekst op de screenshot kon niet gelezen worden. De screenshot is wel als bijlage toegevoegd; vul de trade handmatig in."
+        }
+    }
+
+    /// Vult het formulier met een parse-resultaat. Alleen gevonden velden
+    /// worden overschreven; ontbrekende exit-prijs of aantal worden, als de
+    /// tick-specificatie van het instrument bekend is, uit de P&L berekend.
+    public func applyScreenshotResult(_ result: ScreenshotParseResult, instruments: [Instrument]) {
+        ocrResult = result
+        ocrInstruments = instruments
+        ocrOrigins = [:]
+        guard !result.isEmpty else {
+            ocrMessage = "Geen tradegegevens herkend op de screenshot. De screenshot is als bijlage toegevoegd; vul de velden handmatig in."
+            return
+        }
+
+        if let symbol = result.symbol {
+            applyOCRSymbol(symbol.value, instruments: instruments)
+            markOCR(.symbol, symbol)
+        }
+        if let direction = result.direction {
+            values.direction = direction.value
+            markOCR(.direction, direction)
+        }
+        if let quantity = result.quantity {
+            values.quantity = quantity.value
+            markOCR(.quantity, quantity)
+        }
+        if let entry = result.entryPrice {
+            values.entryPrice = entry.value
+            markOCR(.entryPrice, entry)
+        }
+        if let stop = result.stopLoss {
+            values.stopLoss = stop.value
+            markOCR(.stopLoss, stop)
+        }
+        if let target = result.takeProfit {
+            values.takeProfit = target.value
+            markOCR(.takeProfit, target)
+        }
+        if let commission = result.commission {
+            values.commission = commission.value
+            markOCR(.commission, commission)
+        }
+        if let fees = result.fees {
+            values.fees = fees.value
+            markOCR(.fees, fees)
+        }
+        if let entryTime = result.entryTime {
+            values.entryDate = entryTime.value
+            markOCR(.entryTime, entryTime)
+        }
+        if let exit = result.exitPrice {
+            values.exitPrice = exit.value
+            markOCR(.exitPrice, exit)
+        }
+        if let exitTime = result.exitTime {
+            values.exitDate = max(exitTime.value, values.entryDate)
+            markOCR(.exitTime, exitTime)
+        } else if result.exitPrice != nil, values.exitDate == nil {
+            // Exit-prijs zonder tijd: gesloten trade op het entry-moment.
+            values.exitDate = values.entryDate
+        }
+
+        // Bruto én netto zichtbaar maar geen kosten: het verschil is de commissie.
+        if result.commission == nil, result.fees == nil,
+           let gross = result.grossPnL?.value, let net = result.netPnL?.value, gross - net > StatsService.breakevenTolerance {
+            values.commission = StatsService.rounded(gross - net, toPrecisionOf: 0.01)
+            ocrOrigins[.commission] = .derived
+        }
+
+        deriveMissingOCRValues(from: result)
+        applyOCREntryStyle(from: result)
+
+        let count = ocrOrigins.count
+        let fieldsText = count == 1 ? "1 veld" : "\(count) velden"
+        if let name = result.templateName {
+            ocrMessage = "Herkend als \(name): \(fieldsText) ingevuld. Controleer de gemarkeerde velden."
+        } else {
+            ocrMessage = "Geen bekend platform herkend; met generieke herkenning \(fieldsText) ingevuld. Controleer de gemarkeerde velden."
+        }
+    }
+
+    /// Bruto P&L zoals de screenshot hem toont, of netto + kosten.
+    private func ocrGrossPnL(from result: ScreenshotParseResult) -> Double? {
+        if let gross = result.grossPnL?.value { return gross }
+        if let net = result.netPnL?.value { return net + values.commission + values.fees }
+        return nil
+    }
+
+    /// Ontbrekend aantal of exit-prijs uitrekenen met tick size/value van het
+    /// instrument (alleen als die bekend is: preset of eigen instrument).
+    private func deriveMissingOCRValues(from result: ScreenshotParseResult) {
+        let hasTickSpec = values.instrument != nil || InstrumentPresets.definition(for: values.symbol) != nil
+        guard hasTickSpec, let gross = ocrGrossPnL(from: result) else { return }
+
+        if result.quantity == nil, let entry = result.entryPrice?.value, let exit = result.exitPrice?.value,
+           let quantity = statsService.quantity(
+               forGrossPnL: gross, entryPrice: entry, exitPrice: exit,
+               direction: values.direction, tickSize: values.tickSize, tickValue: values.tickValue
+           ) {
+            values.quantity = quantity
+            ocrOrigins[.quantity] = .derived
+        }
+
+        if result.exitPrice == nil, result.entryPrice != nil,
+           let exit = statsService.exitPrice(
+               forGrossPnL: gross, entryPrice: values.entryPrice, quantity: values.quantity,
+               direction: values.direction, tickSize: values.tickSize, tickValue: values.tickValue
+           ) {
+            values.exitPrice = exit
+            ocrOrigins[.exitPrice] = .derived
+            if values.exitDate == nil { values.exitDate = values.entryDate }
+        }
+    }
+
+    /// Met prijzen: uitgebreide invoer. Alleen een resultaat (geen prijzen):
+    /// snelle invoer met dat bedrag.
+    private func applyOCREntryStyle(from result: ScreenshotParseResult) {
+        if values.entryPrice > 0 || result.exitPrice != nil {
+            entryStyle = .detailed
+            return
+        }
+        let net: Double?
+        if let parsedNet = result.netPnL?.value {
+            net = parsedNet
+        } else if let gross = result.grossPnL?.value {
+            net = gross - (result.commission?.value ?? 0) - (result.fees?.value ?? 0)
+        } else {
+            net = nil
+        }
+        guard let net else { return }
+        entryStyle = .quick
+        quickIsProfit = net >= 0
+        quickAmount = abs(net)
+        ocrOrigins[.netPnL] = result.netPnL != nil ? .recognized : .derived
+    }
+
+    private func markOCR<T: Equatable>(_ field: ScreenshotField, _ parsed: ParsedField<T>) {
+        ocrOrigins[field] = parsed.isDerived ? .derived : .recognized
+    }
+
+    /// Zet het symbool en zoekt het instrument: eerst in de eigen tabel, dan
+    /// in de presets (voor tick size/value).
+    private func applyOCRSymbol(_ symbol: String, instruments: [Instrument]) {
+        let key = symbol.uppercased()
+        values.symbol = key
+        if let instrument = instruments.first(where: { $0.symbol.uppercased() == key }) {
+            values.instrument = instrument
+            values.tickSize = instrument.tickSize
+            values.tickValue = instrument.tickValue
+        } else {
+            values.instrument = nil
+            if let preset = InstrumentPresets.definition(for: key) {
+                values.tickSize = preset.tickSize
+                values.tickValue = preset.tickValue
+            }
+        }
+    }
+
+    /// Hoe het veld is ingevuld door de import, of `nil` als het niet uit OCR komt.
+    public func ocrOrigin(for field: ScreenshotField) -> OCRFieldOrigin? {
+        ocrOrigins[field]
+    }
+
+    /// Alternatieven voor een veld als chip-rij; leeg als er maar één kandidaat is.
+    public func ocrCandidates(for field: ScreenshotField) -> [OCRCandidate] {
+        guard let result = ocrResult, ocrOrigins[field] != nil else { return [] }
+        switch field {
+        case .symbol:
+            return Self.candidates(result.symbol, current: values.symbol) { $0 }
+        case .direction:
+            return Self.candidates(result.direction, current: values.direction) { $0.displayName }
+        case .entryPrice:
+            return Self.candidates(result.entryPrice, current: values.entryPrice, label: Self.numberLabel)
+        case .exitPrice:
+            return Self.candidates(result.exitPrice, current: values.exitPrice, label: Self.numberLabel)
+        case .stopLoss:
+            return Self.candidates(result.stopLoss, current: values.stopLoss, label: Self.numberLabel)
+        case .takeProfit:
+            return Self.candidates(result.takeProfit, current: values.takeProfit, label: Self.numberLabel)
+        case .quantity:
+            return Self.candidates(result.quantity, current: values.quantity, label: Self.numberLabel)
+        case .commission:
+            return Self.candidates(result.commission, current: values.commission, label: Self.numberLabel)
+        case .fees:
+            return Self.candidates(result.fees, current: values.fees, label: Self.numberLabel)
+        case .netPnL:
+            return Self.candidates(result.netPnL, current: quickNetPnL, label: Self.numberLabel)
+        case .entryTime:
+            return Self.candidates(result.entryTime, current: values.entryDate, label: Self.dateLabel)
+        case .exitTime:
+            return Self.candidates(result.exitTime, current: values.exitDate, label: Self.dateLabel)
+        case .grossPnL, .buyPrice, .sellPrice, .buyTime, .sellTime:
+            return []
+        }
+    }
+
+    /// Kiest een alternatief uit de chip-rij van `field`.
+    public func selectOCRCandidate(_ index: Int, for field: ScreenshotField) {
+        guard let result = ocrResult else { return }
+        func pick<T: Equatable>(_ parsed: ParsedField<T>?) -> T? {
+            guard let candidates = parsed?.candidates, candidates.indices.contains(index) else { return nil }
+            return candidates[index]
+        }
+        switch field {
+        case .symbol:
+            guard let symbol = pick(result.symbol) else { return }
+            applyOCRSymbol(symbol, instruments: ocrInstruments)
+        case .direction:
+            guard let direction = pick(result.direction) else { return }
+            values.direction = direction
+        case .entryPrice:
+            guard let price = pick(result.entryPrice) else { return }
+            values.entryPrice = price
+        case .exitPrice:
+            guard let price = pick(result.exitPrice) else { return }
+            values.exitPrice = price
+            if values.exitDate == nil { values.exitDate = values.entryDate }
+        case .stopLoss:
+            guard let price = pick(result.stopLoss) else { return }
+            values.stopLoss = price
+        case .takeProfit:
+            guard let price = pick(result.takeProfit) else { return }
+            values.takeProfit = price
+        case .quantity:
+            guard let quantity = pick(result.quantity) else { return }
+            values.quantity = quantity
+        case .commission:
+            guard let commission = pick(result.commission) else { return }
+            values.commission = commission
+        case .fees:
+            guard let fees = pick(result.fees) else { return }
+            values.fees = fees
+        case .netPnL:
+            guard let net = pick(result.netPnL) else { return }
+            quickIsProfit = net >= 0
+            quickAmount = abs(net)
+        case .entryTime:
+            guard let date = pick(result.entryTime) else { return }
+            values.entryDate = date
+        case .exitTime:
+            guard let date = pick(result.exitTime) else { return }
+            values.exitDate = max(date, values.entryDate)
+        case .grossPnL, .buyPrice, .sellPrice, .buyTime, .sellTime:
+            return
+        }
+        ocrOrigins[field] = .recognized
+    }
+
+    /// Bruto/netto P&L zoals op de screenshot, om naast de berekende P&L te controleren.
+    public var ocrScreenshotPnLText: String? {
+        guard let result = ocrResult else { return nil }
+        let currency = values.account?.currency ?? "USD"
+        if let net = result.netPnL?.value {
+            return "Netto P&L op screenshot: \(net.formatted(.currency(code: currency)))"
+        }
+        if let gross = result.grossPnL?.value {
+            return "Bruto P&L op screenshot: \(gross.formatted(.currency(code: currency)))"
+        }
+        return nil
+    }
+
+    private static func candidates<T: Equatable>(_ parsed: ParsedField<T>?, current: T?, label: (T) -> String) -> [OCRCandidate] {
+        guard let parsed, parsed.candidates.count > 1 else { return [] }
+        return parsed.candidates.enumerated().map { index, value in
+            OCRCandidate(id: index, label: label(value), isSelected: value == current)
+        }
+    }
+
+    private static func numberLabel(_ value: Double) -> String {
+        value == 0 ? "0" : DecimalInput.format(value)
+    }
+
+    private static func dateLabel(_ value: Date) -> String {
+        value.formatted(date: .abbreviated, time: .standard)
     }
 
     /// Slaat het formulier op: maakt een nieuwe trade aan of werkt de

@@ -6,7 +6,8 @@ import SwiftData
 /// - Journal (fase 6): progress tracker, notebook en journal-templates.
 /// - Accounts & doelen (fase 6): accounts met maanddoel, daily loss limit en
 ///   max drawdown; backtest-accounts.
-/// - Instellingen (fase 6): journal-herinnering en app-slot.
+/// - Instellingen (fase 6): journal-herinnering en app-slot; fase 7:
+///   overzicht van de screenshot-templates.
 /// - Data: backup & herstel (incl. automatische backup en CSV-export) en
 ///   CSV-import (fase 5).
 /// - Debug-tools uit fase 1: standaarddata seeden, ~2 jaar voorbeelddata
@@ -78,6 +79,11 @@ struct MoreView: View {
                             AppLockSettingsView(viewModel: appLock)
                         } label: {
                             Label("App-slot", systemImage: "lock")
+                        }
+                        NavigationLink {
+                            ScreenshotTemplatesView()
+                        } label: {
+                            Label("Screenshot-templates", systemImage: "text.viewfinder")
                         }
                     }
 
