@@ -35,6 +35,9 @@ struct TradeFormView: View {
         NavigationStack {
             Form {
                 previewCard
+                if !viewModel.missingFields.isEmpty {
+                    missingFieldsSection
+                }
                 accountSection
                 instrumentSection
                 timingSection
@@ -105,6 +108,18 @@ struct TradeFormView: View {
     }
 
     // MARK: - Secties
+
+    private var missingFieldsSection: some View {
+        Section {
+            ForEach(viewModel.missingFields, id: \.self) { field in
+                Label(field, systemImage: "exclamationmark.circle")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warning)
+            }
+        } header: {
+            Text("Nog nodig om op te slaan")
+        }
+    }
 
     private var accountSection: some View {
         Section("Account") {
@@ -232,7 +247,7 @@ struct TradeFormView: View {
             Text(title)
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
-            TextField(title, value: value, format: .number)
+            DecimalFieldView(title: title, value: value)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(Theme.textPrimary)

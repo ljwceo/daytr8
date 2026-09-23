@@ -34,6 +34,22 @@ final class TradeFormViewModelTests: XCTestCase {
 
     // MARK: - Live preview
 
+    func test_missingFields_listsWhatIsNeeded() {
+        let viewModel = TradeFormViewModel(mode: .create)
+        viewModel.values.symbol = ""
+        viewModel.values.entryPrice = 0
+        viewModel.values.quantity = 0
+        viewModel.values.tickSize = 0
+        XCTAssertEqual(viewModel.missingFields.count, 4)
+
+        viewModel.values.symbol = "NQ"
+        viewModel.values.entryPrice = 18_000
+        viewModel.values.quantity = 1
+        viewModel.values.tickSize = 0.25
+        XCTAssertTrue(viewModel.missingFields.isEmpty)
+        XCTAssertTrue(viewModel.isValid)
+    }
+
     func test_livePreview_computesNetPnLAndRMultiple() {
         let viewModel = TradeFormViewModel(mode: .create)
         viewModel.values.symbol = "NQ"

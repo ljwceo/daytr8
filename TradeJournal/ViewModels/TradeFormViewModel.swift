@@ -68,11 +68,17 @@ public final class TradeFormViewModel {
 
     public var title: String { mode.isEditing ? "Trade bewerken" : "Nieuwe trade" }
 
-    public var isValid: Bool {
-        !values.symbol.trimmingCharacters(in: .whitespaces).isEmpty
-            && values.quantity > 0
-            && values.tickSize > 0
-            && values.entryPrice != 0
+    public var isValid: Bool { missingFields.isEmpty }
+
+    /// Wat er nog ontbreekt om te kunnen opslaan — getoond in het formulier,
+    /// zodat een uitgeschakelde "Opslaan"-knop niet raadselachtig is.
+    public var missingFields: [String] {
+        var missing: [String] = []
+        if values.symbol.trimmingCharacters(in: .whitespaces).isEmpty { missing.append("Symbool (of kies een preset)") }
+        if values.entryPrice == 0 { missing.append("Entry-prijs") }
+        if values.quantity <= 0 { missing.append("Aantal contracten/lots groter dan 0") }
+        if values.tickSize <= 0 { missing.append("Tick size groter dan 0") }
+        return missing
     }
 
     /// Screenshots die al bij de trade horen (alleen relevant bij bewerken).
