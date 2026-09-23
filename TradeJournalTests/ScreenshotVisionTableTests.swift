@@ -104,20 +104,27 @@ final class ScreenshotVisionTableTests: XCTestCase {
         XCTAssertEqual(result.tableRows.last?.direction?.value, .short, lines)
     }
 
-    func test_vision_ninjaTraderTradesTable() async throws {
-        let (result, lines) = try await recognize([
+    /// NinjaTrader: Vision slaat losse cellen met één cijfer over (Trade
+    /// number "1", Qty "1", Bars "7"). De parser levert dan geen aantal; het
+    /// formulier rekent het terug uit Profit, entry en exit met de tick
+    /// size/value van de NQ-preset. Daarom ook via het formulier getest.
+    private var ninjaTraderRows: [[String]] {
+        [
             ["Trade number", "Instrument", "Account", "Strategy", "Market pos.", "Qty", "Entry price", "Exit price",
              "Entry time", "Exit time", "Entry name", "Exit name", "Profit", "Cum. net profit", "Commission", "MAE", "MFE", "ETD", "Bars"],
             ["1", "NQ 12-25", "Sim101", "", "Long", "1", "21450.25", "21470.50",
              "9/22/2025 9:31:22 AM", "9/22/2025 9:52:10 AM", "Entry", "Profit target", "$405.00", "$400.70", "$4.30", "$75.00", "$450.00", "$45.00", "21"],
             ["2", "NQ 12-25", "Sim101", "", "Short", "2", "21480.00", "21490.25",
              "9/22/2025 10:15:00 AM", "9/22/2025 10:21:40 AM", "Entry", "Stop loss", "($410.00)", "($18.60)", "$8.60", "$450.00", "$120.00", "$530.00", "7"]
-        ], title: "Trade Performance")
+        ]
+    }
+
+    func test_vision_ninjaTraderTradesTable() async throws {
+        let (result, lines) = try await recognize(ninjaTraderRows, title: "Trade Performance")
 
         XCTAssertEqual(result.templateID, "ninjatrader", lines)
         XCTAssertEqual(result.symbol?.value, "NQ", lines)
         XCTAssertEqual(result.direction?.value, .long, lines)
-        XCTAssertEqual(result.quantity?.value, 1, lines)
         XCTAssertEqual(result.entryPrice?.value, 21450.25, lines)
         XCTAssertEqual(result.exitPrice?.value, 21470.5, lines)
         XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 9, 31, 22), lines)
@@ -126,5 +133,33 @@ final class ScreenshotVisionTableTests: XCTestCase {
         XCTAssertEqual(result.commission?.value, 4.3, lines)
         XCTAssertEqual(result.tableRows.count, 2, lines)
         XCTAssertEqual(result.tableRows.last?.grossPnL?.value, -410, lines)
+    }
+
+    /// Van screenshot tot formulier: ook het aantal dat Vision overslaat
+    /// komt er goed in, voor beide trades.
+    @MainActor
+    func test_vision_ninjaTraderTable_fillsFormIncludingQuantity() async throws {
+        let viewModel = TradeFormViewModel(
+            mode: .create,
+            textRecognizer: VisionTextRecognizer(),
+            screenshotTemplates: ScreenshotTemplateStore.bundledTemplates()
+        )
+
+        await viewModel.importScreenshot(renderTable(ninjaTraderRows, title: "Trade Performance"), instruments: [])
+
+        XCTAssertEqual(viewModel.values.symbol, "NQ")
+        XCTAssertEqual(viewModel.values.direction, .long)
+        XCTAssertEqual(viewModel.values.entryPrice, 21450.25)
+        XCTAssertEqual(viewModel.values.exitPrice, 21470.5)
+        XCTAssertEqual(viewModel.values.quantity, 1, "Teruggerekend: 20.25 punt × $20 = $405")
+        XCTAssertEqual(viewModel.values.commission, 4.3)
+        XCTAssertEqual(viewModel.brokerNetPnL ?? 0, 400.7, accuracy: 0.001, "Profit − commissie")
+        XCTAssertEqual(viewModel.ocrTradeCandidates.count, 2)
+
+        viewModel.selectOCRTrade(1)
+
+        XCTAssertEqual(viewModel.values.direction, .short)
+        XCTAssertEqual(viewModel.values.quantity, 2, "10.25 punt × $20 × 2 = $410")
+        XCTAssertEqual(viewModel.brokerNetPnL ?? 0, -418.6, accuracy: 0.001)
     }
 }
