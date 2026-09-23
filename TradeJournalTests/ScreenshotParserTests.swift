@@ -133,6 +133,19 @@ final class ScreenshotParserTests: XCTestCase {
         27287.49 \u{2192} 27287.24  2026.04.30 19:09:08
         """
 
+        /// Echte screenshot: MetaTrader 5 (iOS), één opengeklapte trade in de
+        /// geschiedenis. P&L rechts op de prijsregel, open → sluittijd op een
+        /// eigen regel, S/L-T/P en Swap-Charges in twee kolommen ("-" = leeg).
+        static let metaTrader5Expanded = """
+        NAS100 buy 50  #119092393
+        NAS100 Cash
+        27371.55 \u{2192} 27405.48  1 450.14
+        \u{0394} = 3393 (0.12%)
+        2026.04.30 15:12:01 \u{2192} 2026.04.30 15:22:27
+        S/L:  27406.48  Swap:  -
+        T/P:  27441.99  Charges:  -
+        """
+
         static let tradingView = """
         TradingView
         Paper Trading
@@ -338,6 +351,27 @@ final class ScreenshotParserTests: XCTestCase {
 
         XCTAssertEqual(result.grossPnL?.value, -1044.67)
         XCTAssertEqual(result.grossPnL?.alternatives, [1450.14])
+    }
+
+    /// Opengeklapte trade: open- en sluittijd, S/L en T/P, P&L op de
+    /// prijsregel; lege Swap/Charges ("-") blijven leeg.
+    func test_metaTrader5_expandedTrade() {
+        let result = makeParser().parse(Fixture.metaTrader5Expanded)
+
+        XCTAssertEqual(result.templateID, "metatrader")
+        XCTAssertEqual(result.symbol?.value, "NAS100")
+        XCTAssertEqual(result.direction?.value, .long)
+        XCTAssertEqual(result.quantity?.value, 50)
+        XCTAssertEqual(result.entryPrice?.value, 27371.55)
+        XCTAssertEqual(result.exitPrice?.value, 27405.48)
+        XCTAssertEqual(result.stopLoss?.value, 27406.48)
+        XCTAssertEqual(result.takeProfit?.value, 27441.99)
+        XCTAssertEqual(result.grossPnL?.value, 1450.14)
+        XCTAssertNil(result.netPnL)
+        XCTAssertNil(result.commission)
+        XCTAssertNil(result.fees)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2026, 4, 30, 15, 12, 1))
+        XCTAssertEqual(result.exitTime?.value, utcDate(2026, 4, 30, 15, 22, 27))
     }
 
     // MARK: - TradingView
