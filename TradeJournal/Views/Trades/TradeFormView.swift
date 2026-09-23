@@ -149,6 +149,22 @@ struct TradeFormView: View {
                     .foregroundStyle(succeeded ? Theme.textSecondary : Theme.warning)
             }
 
+            if !viewModel.ocrTradeCandidates.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Trade op de screenshot")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(viewModel.ocrTradeCandidates) { candidate in
+                            ChipView(title: candidate.label, color: Theme.accent, isSelected: candidate.isSelected) {
+                                viewModel.selectOCRTrade(candidate.id)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
             if let pnlText = viewModel.ocrScreenshotPnLText {
                 Text(pnlText)
                     .font(.footnote)

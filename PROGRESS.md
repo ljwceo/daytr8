@@ -923,10 +923,51 @@ alleen zoekresultaten waren beschikbaar. Bevindingen:
   ongewijzigd gelaten.
 - Mobiele apps (Tradovate, TopstepX) kunnen, net als MT5, rijen/kaarten
   tonen die wél passen; niet te controleren zonder screenshots.
-- Voorstel (nog niet gebouwd, vraagt akkoord): tabellen lezen met de
-  posities van de Vision-blokken — kolomkoppen herkennen via een nieuwe
-  optionele template-sectie, waarden per rij aan de kop erboven koppelen,
-  één rij = één trade (kiezen per trade in plaats van per veld).
+- Voorstel: tabellen lezen met de posities van de Vision-blokken — zie
+  hieronder, gebouwd.
+
+### Tabellen lezen (Tradovate, TopstepX, NinjaTrader)
+
+- `Models/ScreenshotTemplate.swift` — optionele sectie `columns` (per veld
+  de kopteksten, `postProcess` per kolom; sleutels die geen veld zijn, zoals
+  `"other"`, zijn kolommen die herkend maar overgeslagen worden).
+  Formaatversie blijft 1: oudere templates zonder `columns` blijven geldig.
+- `Services/ScreenshotTableReader.swift` (nieuw) — zoekt de regel met de
+  meeste herkende koppen (minstens 3), koppelt elke waarde aan de kop
+  erboven via x-positie (blok/cel onder één kop in zijn geheel; anders per
+  woord op overlap), elke rij daaronder = één trade. Het platform dat aan de
+  keywords herkend is gaat voor; anders wint het template met de meeste
+  herkende koppen (TopstepX werkt dus ook zonder logo in beeld).
+- `Services/ScreenshotTextRecognizer.swift` — `recognizeBoxes` (blokken mét
+  positie); `ScreenshotLineBuilder.rows(from:)` en `boxes(fromLines:)`
+  (tekst zonder posities als vaste tekenbreedte, zodat uitgelijnde
+  tekstfixtures als tabel te testen zijn).
+- `Services/ScreenshotParser.swift` — `parse(boxes:)`: eerst tabel, anders
+  de bestaande label-waarde-route. Elke rij wordt een eigen resultaat in
+  `ScreenshotParseResult.tableRows`; de eerste is het voorstel.
+- `TradeFormViewModel` / `TradeFormView` — bij meerdere trades een chip-rij
+  "Trade op de screenshot" (`selectOCRTrade`): kiest een hele trade, zodat
+  waarden van verschillende rijen niet door elkaar raken.
+- `ScreenshotTemplatesView` — toont de tabelkolommen per template.
+- Templates: `columns` voor `tradovate.json` (Symbol, Qty, Buy/Sell Price,
+  P&L, Bought/Sold Timestamp), `topstepx.json` (Symbol, Size, Type,
+  Entry/Exit Time, Entry/Exit Price, P&L, Fees) en `ninjatrader.json`
+  (standaardkolommen van Trade Performance → Trades).
+- Tests: tabelfixtures per platform (ook TopstepX zonder logo), een test
+  met losse Vision-blokken (samengevoegde koppen, tijd breder dan kop) en
+  een formuliertest voor het kiezen van een trade.
+- `ScreenshotVisionTableTests` — end-to-end met **echte Apple Vision-OCR**
+  in CI: de tabellen worden als afbeelding getekend, door
+  `VisionTextRecognizer` gelezen en geparst. Tradovate en TopstepX komen er
+  volledig uit. Bevinding: Vision slaat losse cellen met één cijfer over
+  (NinjaTrader Qty "1"); het formulier rekent het aantal dan terug uit
+  Profit, entry en exit (tick size/value van het instrument), ook getest.
+  Echte screenshots van deze platforms waren vanuit de cloudomgeving niet
+  op te halen (netwerkbeleid).
+- Openstaand: de kolomkoppen komen uit documentatie, niet uit echte
+  screenshots; mobiele weergaven van Tradovate/TopstepX (kaarten i.p.v.
+  tabellen) zijn niet getest. Bij de eerste echte screenshot per platform
+  de koppen/fixtures bijstellen.
 
 ## Volgende fase
 

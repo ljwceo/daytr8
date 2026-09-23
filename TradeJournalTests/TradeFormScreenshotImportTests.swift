@@ -155,6 +155,41 @@ final class TradeFormScreenshotImportTests: XCTestCase {
         XCTAssertEqual(viewModel.entryStyle, .detailed)
     }
 
+    /// Tabel met meerdere trades: de eerste wordt ingevuld, de andere zijn
+    /// als hele trade te kiezen (geen mix van waarden uit verschillende rijen).
+    func test_import_table_selectsWholeTrade() async {
+        let lines = [
+            "Tradovate",
+            "Performance",
+            "Symbol  Qty  Buy Price  Sell Price  P&L      Bought Timestamp     Sold Timestamp       Duration",
+            "MNQZ5   2    21450.25   21462.75    $50.00   09/22/2025 09:31:22  09/22/2025 09:45:10  13min 48sec",
+            "ESZ5    1    6650.50    6655.00     $225.00  09/22/2025 10:12:40  09/22/2025 10:02:05  10min 35sec",
+            "MNQZ5   1    21470.00   21465.50    $(9.00)  09/22/2025 11:00:01  09/22/2025 11:03:30  3min 29sec"
+        ]
+        let viewModel = makeViewModel(recognizer: StubRecognizer(lines: lines))
+
+        await viewModel.importScreenshot(screenshot, instruments: [])
+
+        XCTAssertEqual(viewModel.values.symbol, "MNQ")
+        XCTAssertEqual(viewModel.values.direction, .long)
+        XCTAssertEqual(viewModel.values.entryPrice, 21450.25)
+        XCTAssertEqual(viewModel.brokerNetPnL, 50)
+        XCTAssertEqual(viewModel.ocrTradeCandidates.map(\.isSelected), [true, false, false])
+        XCTAssertTrue(viewModel.ocrTradeCandidates[1].label.hasPrefix("ES · Short · 6655"), viewModel.ocrTradeCandidates[1].label)
+        XCTAssertTrue(viewModel.ocrMessage?.contains("3 trades") ?? false)
+
+        viewModel.selectOCRTrade(1)
+
+        XCTAssertEqual(viewModel.values.symbol, "ES")
+        XCTAssertEqual(viewModel.values.tickValue, 12.5, "Tick value uit de ES-preset")
+        XCTAssertEqual(viewModel.values.direction, .short)
+        XCTAssertEqual(viewModel.values.entryPrice, 6655)
+        XCTAssertEqual(viewModel.values.exitPrice, 6650.5)
+        XCTAssertEqual(viewModel.values.quantity, 1)
+        XCTAssertEqual(viewModel.brokerNetPnL, 225)
+        XCTAssertEqual(viewModel.ocrTradeCandidates.map(\.isSelected), [false, true, false])
+    }
+
     // MARK: - Symbool tegen de instrumenttabel
 
     func test_apply_symbolMatchesOwnInstrument() throws {

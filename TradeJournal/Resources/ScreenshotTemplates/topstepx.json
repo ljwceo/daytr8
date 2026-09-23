@@ -63,5 +63,96 @@
         "absolute"
       ]
     }
+  },
+  "columns": {
+    "symbol": {
+      "labels": [
+        "symbol",
+        "contract",
+        "contract name",
+        "instrument"
+      ]
+    },
+    "direction": {
+      "labels": [
+        "type",
+        "side",
+        "direction"
+      ]
+    },
+    "quantity": {
+      "labels": [
+        "size",
+        "qty",
+        "quantity"
+      ]
+    },
+    "entry_price": {
+      "labels": [
+        "entry price",
+        "entry"
+      ]
+    },
+    "exit_price": {
+      "labels": [
+        "exit price",
+        "exit"
+      ]
+    },
+    "entry_time": {
+      "labels": [
+        "entry time",
+        "entered at",
+        "open time",
+        "time"
+      ]
+    },
+    "exit_time": {
+      "labels": [
+        "exit time",
+        "exited at",
+        "close time"
+      ]
+    },
+    "gross_pnl": {
+      "labels": [
+        "p&l",
+        "pnl",
+        "gross p&l"
+      ]
+    },
+    "net_pnl": {
+      "labels": [
+        "net p&l",
+        "net pnl"
+      ]
+    },
+    "fees": {
+      "labels": [
+        "fees",
+        "fee"
+      ],
+      "postProcess": [
+        "absolute"
+      ]
+    },
+    "commission": {
+      "labels": [
+        "commissions",
+        "commission"
+      ],
+      "postProcess": [
+        "absolute"
+      ]
+    },
+    "other": {
+      "labels": [
+        "id",
+        "duration",
+        "trade duration",
+        "trade day",
+        "account"
+      ]
+    }
   }
 }

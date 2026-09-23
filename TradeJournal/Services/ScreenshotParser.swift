@@ -14,6 +14,10 @@ import Foundation
 ///    zelf al definieert (zie `ScreenshotField.relatedGroups`).
 /// 4. Heuristieken: symbool zoeken tussen bekende instrumenten, koop-/
 ///    verkoopkant omzetten naar richting + entry/exit.
+///
+/// Tabellen (kolomkoppen op één regel, per trade een rij eronder) gaan vóór:
+/// herkent `ScreenshotTableReader` de koppen van een template, dan wordt elke
+/// rij één trade (`tableRows`) en is de eerste rij het voorstel.
 public struct ScreenshotParser: Sendable {
 
     /// Maximaal aantal kandidaten per veld (voorstel + alternatieven).
@@ -54,16 +58,57 @@ public struct ScreenshotParser: Sendable {
 
     // MARK: - Parsen
 
-    /// Parseert OCR-regels (bovenaan eerst).
+    /// Parseert OCR-regels (bovenaan eerst). Kolommen die in de tekst onder
+    /// elkaar staan, tellen als tabel (zie `ScreenshotLineBuilder.boxes(fromLines:)`).
     public func parse(lines: [String], referenceDate: Date = Date()) -> ScreenshotParseResult {
-        parse(lines.joined(separator: "\n"), referenceDate: referenceDate)
+        parse(boxes: ScreenshotLineBuilder.boxes(fromLines: lines), referenceDate: referenceDate)
     }
 
     /// Parseert de volledige OCR-tekst.
     /// - Parameter referenceDate: dag voor tijden zonder datum (bijv. "09:31:22").
     public func parse(_ rawText: String, referenceDate: Date = Date()) -> ScreenshotParseResult {
-        let text = Self.normalize(rawText)
+        parse(lines: rawText.components(separatedBy: .newlines), referenceDate: referenceDate)
+    }
+
+    /// Parseert Vision-blokken met positie: eerst als tabel, anders als
+    /// label-waarde-tekst.
+    public func parse(boxes: [RecognizedTextBox], referenceDate: Date = Date()) -> ScreenshotParseResult {
+        let normalized = boxes.map { RecognizedTextBox(text: Self.normalize($0.text), boundingBox: $0.boundingBox) }
+        let text = ScreenshotLineBuilder.lines(from: normalized).joined(separator: "\n")
         let broker = detectBroker(in: text)
+
+        let platformTemplates = templates.filter { !$0.isFallbackTemplate }
+        if let table = ScreenshotTableReader.read(normalized, templates: platformTemplates, preferred: broker) {
+            let trades = table.rows
+                .map { tableRowResult($0, template: table.template, referenceDate: referenceDate) }
+                .filter { $0.recognizedFields.count >= 2 }
+            if var first = trades.first {
+                first.tableRows = trades.count > 1 ? trades : []
+                return first
+            }
+        }
+        return parseText(text, broker: broker, referenceDate: referenceDate)
+    }
+
+    // MARK: - Tabel
+
+    /// Eén tabelrij als trade: de ruwe tekst per kolom omgezet zoals bij de
+    /// regexen, met de `postProcess` van de kolom.
+    private func tableRowResult(_ row: [String: String], template: ScreenshotTemplate, referenceDate: Date) -> ScreenshotParseResult {
+        let valueParser = ImportValueParser(dateOrder: template.dateOrder ?? .monthFirst, timeZone: timeZone)
+        var collected: [ScreenshotField: Collected] = [:]
+        for field in ScreenshotField.allCases {
+            guard let raw = row[field.rawValue] else { continue }
+            let steps = Set((template.columns?[field.rawValue]?.postProcess ?? []).map { $0.lowercased() })
+            guard let value = convert(raw, field: field, steps: steps, valueParser: valueParser, referenceDate: referenceDate) else { continue }
+            collected[field] = Collected(values: [value], source: template.name, isFallback: false)
+        }
+        return makeResult(collected, templateID: template.id, templateName: template.name)
+    }
+
+    // MARK: - Label-waarde-tekst
+
+    private func parseText(_ text: String, broker: ScreenshotTemplate?, referenceDate: Date) -> ScreenshotParseResult {
         let fallbacks = templates.filter(\.isFallbackTemplate)
 
         var collected: [ScreenshotField: Collected] = [:]
@@ -86,7 +131,12 @@ public struct ScreenshotParser: Sendable {
             collected[.symbol] = Collected(values: found, source: fallbacks.first?.name ?? "Generiek", isFallback: true)
         }
 
-        var result = ScreenshotParseResult(templateID: broker?.id, templateName: broker?.name)
+        return makeResult(collected, templateID: broker?.id, templateName: broker?.name)
+    }
+
+    /// Resultaat uit de verzamelde kandidaten, met koop-/verkoopkant omgezet.
+    private func makeResult(_ collected: [ScreenshotField: Collected], templateID: String?, templateName: String?) -> ScreenshotParseResult {
+        var result = ScreenshotParseResult(templateID: templateID, templateName: templateName)
         result.symbol = Self.field(collected[.symbol]) { if case .text(let v) = $0 { return v }; return nil }
         result.direction = Self.field(collected[.direction]) { if case .direction(let v) = $0 { return v }; return nil }
         result.entryPrice = Self.numberField(collected[.entryPrice])

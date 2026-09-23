@@ -46,6 +46,11 @@ public struct ScreenshotParseResult: Equatable, Sendable {
     public var entryTime: ParsedField<Date>?
     public var exitTime: ParsedField<Date>?
 
+    /// Tabel met meerdere trades (bijv. Tradovate Performance): elke rij als
+    /// eigen resultaat, de eerste is ook het resultaat zelf. Leeg bij één
+    /// trade of een label-waarde-layout.
+    public var tableRows: [ScreenshotParseResult] = []
+
     public init(templateID: String? = nil, templateName: String? = nil) {
         self.templateID = templateID
         self.templateName = templateName

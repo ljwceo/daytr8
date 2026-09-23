@@ -115,6 +115,20 @@ public enum ScreenshotField: String, Codable, CaseIterable, Identifiable, Sendab
 ///   is de voorgestelde waarde.
 /// - `postProcess`: optionele stappen na het omzetten: `absolute`, `negate`
 ///   (getallen), `uppercase`, `strip_spaces` (tekst).
+/// - `columns` (optioneel): tabelweergave met kolomkoppen op één regel en per
+///   trade een rij eronder (bijv. Tradovate Performance, NinjaTrader Trades).
+///   Per veld de mogelijke kopteksten (hoofdletterongevoelig, hele woorden).
+///   Sleutels die geen veld zijn (bijv. `"other"`) zijn kolommen die de
+///   parser herkent maar overslaat, zodat hun waarden niet bij een buurkolom
+///   terechtkomen. Een rij met minstens drie herkende koppen is de kopregel.
+///
+///   ```json
+///   "columns": {
+///     "entry_price": { "labels": ["entry price"] },
+///     "commission": { "labels": ["commission"], "postProcess": ["absolute"] },
+///     "other": { "labels": ["account", "strategy"] }
+///   }
+///   ```
 public struct ScreenshotTemplate: Codable, Identifiable, Equatable, Sendable {
 
     /// Hoogste templateformaat dat deze app-versie begrijpt.
@@ -133,6 +147,17 @@ public struct ScreenshotTemplate: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    /// Kolom in een tabelweergave: de mogelijke kopteksten.
+    public struct ColumnRule: Codable, Equatable, Sendable {
+        public var labels: [String]
+        public var postProcess: [String]?
+
+        public init(labels: [String], postProcess: [String]? = nil) {
+            self.labels = labels
+            self.postProcess = postProcess
+        }
+    }
+
     public var formatVersion: Int
     public var id: String
     public var name: String
@@ -142,6 +167,8 @@ public struct ScreenshotTemplate: Codable, Identifiable, Equatable, Sendable {
     /// Volgorde van dag/maand in datums als `09/10/2025`. Jaar-eerst is altijd eenduidig.
     public var dateOrder: ImportDateOrder?
     public var fields: [String: FieldRule]
+    /// Tabelweergave (optioneel), zie de uitleg boven dit type.
+    public var columns: [String: ColumnRule]?
 
     public init(
         formatVersion: Int = ScreenshotTemplate.supportedFormatVersion,
@@ -151,7 +178,8 @@ public struct ScreenshotTemplate: Codable, Identifiable, Equatable, Sendable {
         priority: Int? = nil,
         keywords: [String],
         dateOrder: ImportDateOrder? = nil,
-        fields: [String: FieldRule]
+        fields: [String: FieldRule],
+        columns: [String: ColumnRule]? = nil
     ) {
         self.formatVersion = formatVersion
         self.id = id
@@ -161,6 +189,7 @@ public struct ScreenshotTemplate: Codable, Identifiable, Equatable, Sendable {
         self.keywords = keywords
         self.dateOrder = dateOrder
         self.fields = fields
+        self.columns = columns
     }
 
     public var isFallbackTemplate: Bool { isFallback ?? false }

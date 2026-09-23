@@ -92,6 +92,26 @@ private struct ScreenshotTemplateDetailView: View {
                 }
             }
 
+            if let columns = template.columns, !columns.isEmpty {
+                Section {
+                    ForEach(columns.keys.sorted(), id: \.self) { key in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ScreenshotField(rawValue: key)?.displayName ?? "Overgeslagen")
+                                .foregroundStyle(Theme.textPrimary)
+                            Text((columns[key]?.labels ?? []).joined(separator: ", "))
+                                .font(.caption.monospaced())
+                                .foregroundStyle(Theme.textSecondary)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } header: {
+                    Text("Tabelkolommen")
+                } footer: {
+                    Text("Kolomkoppen voor tabelweergaven: waarden worden gekoppeld aan de kop erboven, elke rij is één trade.")
+                }
+            }
+
             Section {
                 LabeledContent("Id", value: template.id)
                 LabeledContent("Formaatversie", value: "\(template.formatVersion)")
