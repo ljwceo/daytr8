@@ -5,7 +5,10 @@ final class FillAggregatorTests: XCTestCase {
 
     private let t0 = Date(timeIntervalSince1970: 1_733_400_000)
 
-    private func fill(_ symbol: String = "NQ", _ minutes: Double, _ quantity: Double, _ price: Double, commission: Double = 0, row: Int = 0) -> ImportedFill {
+    // Symbol staat achteraan met een default zodat de meeste tests hem mogen
+    // overslaan; Swift laat een defaulted `_`-parameter in het midden niet toe.
+    private func fill(_ minutes: Double, _ quantity: Double, _ price: Double,
+                      symbol: String = "NQ", commission: Double = 0, row: Int = 0) -> ImportedFill {
         ImportedFill(symbol: symbol, date: t0.addingTimeInterval(minutes * 60), price: price,
                      signedQuantity: quantity, commission: commission, sourceRow: row)
     }
@@ -67,10 +70,10 @@ final class FillAggregatorTests: XCTestCase {
 
     func test_separatesSymbolsAndSortsByEntry() {
         let trades = FillAggregator.aggregate([
-            fill("ES", 1, 1, 5_000),
-            fill("NQ", 0, 1, 21_000),
-            fill("ES", 2, -1, 5_001),
-            fill("NQ", 3, -1, 21_001)
+            fill(1, 1, 5_000, symbol: "ES"),
+            fill(0, 1, 21_000, symbol: "NQ"),
+            fill(2, -1, 5_001, symbol: "ES"),
+            fill(3, -1, 21_001, symbol: "NQ")
         ])
         XCTAssertEqual(trades.map(\.symbol), ["NQ", "ES"])
         XCTAssertTrue(trades.allSatisfy { !$0.isOpen })
