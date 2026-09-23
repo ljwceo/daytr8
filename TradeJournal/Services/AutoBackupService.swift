@@ -47,6 +47,7 @@ public struct AutoBackupService {
     public func clearFolder() {
         settings.autoBackupFolderBookmark = nil
         settings.autoBackupFolderName = nil
+        settings.lastAutoBackupError = nil
     }
 
     /// Lost de bookmark op naar een URL; ververst hem als iOS hem als
@@ -66,8 +67,9 @@ public struct AutoBackupService {
     // MARK: - Uitvoeren
 
     /// Draait een automatische backup als die volgens de instellingen nodig
-    /// is. Fouten worden bewust ingeslikt (dit draait op de achtergrond bij
-    /// app-start); de "laatste backup"-waarschuwing blijft dan gewoon staan.
+    /// is. Fouten gooien we hier niet (dit draait bij app-start); ze worden
+    /// door `runNow` bewaard in `settings.lastAutoBackupError` en getoond in
+    /// de backupherinnering en Backup & herstel.
     @discardableResult
     public func runIfDue(context: ModelContext, isLaunch: Bool, now: Date = Date()) -> URL? {
         guard settings.isAutoBackupDue(isLaunch: isLaunch, now: now) else { return nil }
@@ -82,6 +84,17 @@ public struct AutoBackupService {
     /// backups op (alleen de nieuwste `autoBackupKeepCount` blijven staan).
     @discardableResult
     public func runNow(context: ModelContext, now: Date = Date()) throws -> URL {
+        do {
+            let url = try writeBackup(context: context, now: now)
+            settings.lastAutoBackupError = nil
+            return url
+        } catch {
+            settings.lastAutoBackupError = error.localizedDescription
+            throw error
+        }
+    }
+
+    private func writeBackup(context: ModelContext, now: Date) throws -> URL {
         guard settings.autoBackupFolderBookmark != nil else { throw AutoBackupError.noFolder }
         guard let folder = resolveFolder() else { throw AutoBackupError.folderUnavailable }
 

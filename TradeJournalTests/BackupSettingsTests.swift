@@ -81,4 +81,24 @@ final class BackupSettingsTests: XCTestCase {
         )
         XCTAssertEqual(AutoBackupService.backupsToPrune(fileNames: files, keep: 5), [])
     }
+
+    func test_shouldShowReminder_respectsDismissal() {
+        XCTAssertTrue(BackupSettings.shouldShowReminder(lastBackup: nil, dismissed: false, now: now))
+        XCTAssertFalse(BackupSettings.shouldShowReminder(lastBackup: nil, dismissed: true, now: now))
+        XCTAssertFalse(BackupSettings.shouldShowReminder(lastBackup: now.addingTimeInterval(-day), dismissed: false, now: now))
+
+        let settings = BackupSettings(defaults: defaults)
+        XCTAssertFalse(settings.isReminderDismissed)
+        settings.isReminderDismissed = true
+        XCTAssertTrue(BackupSettings(defaults: defaults).isReminderDismissed)
+    }
+
+    func test_lastAutoBackupError_emptyMeansNil() {
+        let settings = BackupSettings(defaults: defaults)
+        XCTAssertNil(settings.lastAutoBackupError)
+        settings.lastAutoBackupError = "Map weg"
+        XCTAssertEqual(BackupSettings(defaults: defaults).lastAutoBackupError, "Map weg")
+        settings.lastAutoBackupError = nil
+        XCTAssertNil(settings.lastAutoBackupError)
+    }
 }

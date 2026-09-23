@@ -996,6 +996,34 @@ geen scherm om confluences toe te voegen, te bewerken of te verwijderen
 - Geen wijziging aan SwiftData-schema of backupformaat (confluences zaten al
   in de backup).
 
+## Backupherinnering en automatische backup (fix na test op toestel)
+
+Op het toestel bleef de backupmelding staan, ook na het maken van een backup,
+en leek de automatische backup niets te doen.
+
+- **Handmatige backup telde niet mee.** Bij "Bewaar in Bestanden" sluit de
+  share sheet zichzelf; SwiftUI's `onDismiss` kwam vóór de completion-handler,
+  riep `shareSheetFinished(completed: false)` aan en wiste het bestand. De
+  latere `completed: true` vond niets meer en registreerde de backup niet.
+  `BackupViewModel` houdt het gedeelde bestand nu apart vast
+  (`inFlightShare`); `onDismiss` → `shareSheetDismissed()` sluit alleen de
+  sheet, de completion-handler bepaalt het resultaat (volgorde maakt niet uit).
+- **Automatische backup** (`AutoBackupService`): fouten werden stil
+  ingeslikt. `runNow` bewaart nu de foutmelding (`BackupSettings.lastAutoBackupError`),
+  getoond in Backup & herstel en in de dashboardbanner; bij succes gewist.
+  Na het kiezen van een map wordt er direct een eerste backup gemaakt (voorheen
+  pas bij de volgende app-start), zodat meteen zichtbaar is of het werkt.
+  Footer legt uit dat automatische backup uit staat tot er een map gekozen is.
+- **Melding wegklikken**: kruisje op `BackupReminderBannerView` → bevestiging
+  ("Ik begrijp het, uitzetten") met uitleg waarom backups belangrijk zijn.
+  Opgeslagen als `BackupSettings.isReminderDismissed`; weer aan te zetten met
+  "Backupherinnering tonen" in Backup & herstel. Ook het waarschuwingsicoon in
+  Meer respecteert dit (`BackupSettings.shouldShowReminder`).
+- Tests: `BackupFlowTests` (share sheet in beide volgordes, annuleren,
+  CSV telt niet, map kiezen → direct backup, `runIfDue` bij start en
+  dagelijks + backup terug te lezen, mislukte backup → fout bewaard en gewist)
+  en extra `BackupSettingsTests`.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
