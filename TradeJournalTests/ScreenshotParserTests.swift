@@ -97,6 +97,55 @@ final class ScreenshotParserTests: XCTestCase {
         Swap:  -1.20
         """
 
+        /// Echte screenshot: MetaTrader 5 (iOS), tab Geschiedenis, ingeklapte
+        /// rijen met twee trades. Geen labels en geen platformnaam in beeld;
+        /// "sell 2.5" = richting + lots, de P&L staat rechts op de eerste regel,
+        /// de tijd rechts op de tweede is de sluittijd.
+        static let metaTrader5History = """
+        NAS100 sell 2.5  -169.53
+        27722.47 \u{2192} 27799.66  2026.07.29 16:33:04
+        NAS100 sell 2.5  183.17
+        27615.86 \u{2192} 27532.41  2026.07.29 17:13:04
+        """
+
+        /// Echte screenshot: MetaTrader 5 (iOS), langere geschiedenislijst met
+        /// buy én sell en bedragen met een spatie als duizendtalscheiding.
+        static let metaTrader5HistoryLong = """
+        NAS100 buy 10  -109.35
+        27173.35 \u{2192} 27160.55  2026.04.24 17:58:32
+        NAS100 buy 10  1 040.25
+        27175.10 \u{2192} 27296.95  2026.04.24 18:45:06
+        NAS100 sell 10  135.78
+        27367.60 \u{2192} 27351.65  2026.04.27 15:06:35
+        NAS100 buy 20  -541.01
+        27045.81 \u{2192} 27014.17  2026.04.28 16:30:05
+        NAS100 buy 20  1 492.86
+        27026.81 \u{2192} 27114.17  2026.04.28 16:43:37
+        NAS100 sell 20  6.15
+        27115.92 \u{2192} 27115.56  2026.04.28 16:44:33
+        NAS100 buy 10  508.46
+        27113.76 \u{2192} 27173.21  2026.04.29 17:41:56
+        NAS100 buy 50  1 450.14
+        27371.55 \u{2192} 27405.48  2026.04.30 15:22:27
+        NAS100 buy 25  -1 044.67
+        27300.24 \u{2192} 27251.24  2026.04.30 19:02:27
+        NAS100 buy 25  -5.33
+        27287.49 \u{2192} 27287.24  2026.04.30 19:09:08
+        """
+
+        /// Echte screenshot: MetaTrader 5 (iOS), één opengeklapte trade in de
+        /// geschiedenis. P&L rechts op de prijsregel, open → sluittijd op een
+        /// eigen regel, S/L-T/P en Swap-Charges in twee kolommen ("-" = leeg).
+        static let metaTrader5Expanded = """
+        NAS100 buy 50  #119092393
+        NAS100 Cash
+        27371.55 \u{2192} 27405.48  1 450.14
+        \u{0394} = 3393 (0.12%)
+        2026.04.30 15:12:01 \u{2192} 2026.04.30 15:22:27
+        S/L:  27406.48  Swap:  -
+        T/P:  27441.99  Charges:  -
+        """
+
         static let tradingView = """
         TradingView
         Paper Trading
@@ -246,6 +295,83 @@ final class ScreenshotParserTests: XCTestCase {
         XCTAssertEqual(result.fees?.value, 1.2, "Negatieve swap is een kost (postProcess negate)")
         XCTAssertEqual(result.entryTime?.value, utcDate(2025, 9, 22, 10, 15, 3))
         XCTAssertEqual(result.exitTime?.value, utcDate(2025, 9, 22, 11, 2, 44))
+    }
+
+    /// Ingeklapte geschiedenislijst zonder labels: platform herkennen aan de
+    /// pijl tussen open- en sluitprijs, de eerste trade is het voorstel, de
+    /// volgende komt als alternatief.
+    func test_metaTrader5_historyListWithoutLabels() {
+        let result = makeParser().parse(Fixture.metaTrader5History)
+
+        XCTAssertEqual(result.templateID, "metatrader")
+        XCTAssertEqual(result.symbol?.value, "NAS100")
+        XCTAssertEqual(result.direction?.value, .short)
+        XCTAssertEqual(result.quantity?.value, 2.5)
+        XCTAssertEqual(result.entryPrice?.value, 27722.47)
+        XCTAssertEqual(result.entryPrice?.alternatives, [27615.86])
+        XCTAssertEqual(result.exitPrice?.value, 27799.66)
+        XCTAssertEqual(result.exitPrice?.alternatives, [27532.41])
+        XCTAssertEqual(result.grossPnL?.value, -169.53)
+        XCTAssertEqual(result.grossPnL?.alternatives, [183.17])
+        XCTAssertNil(result.netPnL)
+        XCTAssertNil(result.stopLoss)
+        XCTAssertNil(result.takeProfit)
+        XCTAssertNil(result.entryTime, "De ingeklapte rij toont alleen de sluittijd")
+        XCTAssertEqual(result.exitTime?.value, utcDate(2026, 7, 29, 16, 33, 4))
+        XCTAssertEqual(result.exitTime?.alternatives, [utcDate(2026, 7, 29, 17, 13, 4)])
+    }
+
+    /// Langere lijst: bedragen met spatie als duizendtalscheiding ("1 040.25",
+    /// "-1 044.67") blijven hele getallen; de eerste trade is het voorstel.
+    func test_metaTrader5_historyListWithThousandsSpaces() {
+        let result = makeParser().parse(Fixture.metaTrader5HistoryLong)
+
+        XCTAssertEqual(result.templateID, "metatrader")
+        XCTAssertEqual(result.symbol?.value, "NAS100")
+        XCTAssertEqual(result.direction?.value, .long)
+        XCTAssertEqual(result.direction?.alternatives, [.short])
+        XCTAssertEqual(result.quantity?.value, 10)
+        XCTAssertEqual(result.quantity?.alternatives, [20, 50, 25])
+        XCTAssertEqual(result.entryPrice?.value, 27173.35)
+        XCTAssertEqual(result.exitPrice?.value, 27160.55)
+        XCTAssertEqual(result.grossPnL?.value, -109.35)
+        XCTAssertEqual(result.grossPnL?.alternatives, [1040.25, 135.78, -541.01, 1492.86])
+        XCTAssertEqual(result.exitTime?.value, utcDate(2026, 4, 24, 17, 58, 32))
+    }
+
+    /// Alleen de rijen met duizendtallen: niet afgekapt tot "1" of "-1".
+    func test_metaTrader5_thousandsSpaceInPnL() {
+        let text = """
+        NAS100 buy 25  -1 044.67
+        27300.24 \u{2192} 27251.24  2026.04.30 19:02:27
+        NAS100 buy 50  1 450.14
+        27371.55 \u{2192} 27405.48  2026.04.30 15:22:27
+        """
+        let result = makeParser().parse(text)
+
+        XCTAssertEqual(result.grossPnL?.value, -1044.67)
+        XCTAssertEqual(result.grossPnL?.alternatives, [1450.14])
+    }
+
+    /// Opengeklapte trade: open- en sluittijd, S/L en T/P, P&L op de
+    /// prijsregel; lege Swap/Charges ("-") blijven leeg.
+    func test_metaTrader5_expandedTrade() {
+        let result = makeParser().parse(Fixture.metaTrader5Expanded)
+
+        XCTAssertEqual(result.templateID, "metatrader")
+        XCTAssertEqual(result.symbol?.value, "NAS100")
+        XCTAssertEqual(result.direction?.value, .long)
+        XCTAssertEqual(result.quantity?.value, 50)
+        XCTAssertEqual(result.entryPrice?.value, 27371.55)
+        XCTAssertEqual(result.exitPrice?.value, 27405.48)
+        XCTAssertEqual(result.stopLoss?.value, 27406.48)
+        XCTAssertEqual(result.takeProfit?.value, 27441.99)
+        XCTAssertEqual(result.grossPnL?.value, 1450.14)
+        XCTAssertNil(result.netPnL)
+        XCTAssertNil(result.commission)
+        XCTAssertNil(result.fees)
+        XCTAssertEqual(result.entryTime?.value, utcDate(2026, 4, 30, 15, 12, 1))
+        XCTAssertEqual(result.exitTime?.value, utcDate(2026, 4, 30, 15, 22, 27))
     }
 
     // MARK: - TradingView
