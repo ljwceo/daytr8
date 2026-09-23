@@ -67,14 +67,14 @@ struct BackupView: View {
             case .success(let url):
                 switch importerKind {
                 case .restore: viewModel.prepareRestore(from: url)
-                case .folder: viewModel.setAutoBackupFolder(url)
+                case .folder: viewModel.setAutoBackupFolder(url, context: modelContext)
                 }
             case .failure(let error):
                 viewModel.errorMessage = error.localizedDescription
             }
         }
         .sheet(item: $viewModel.shareFile, onDismiss: {
-            viewModel.shareSheetFinished(completed: false)
+            viewModel.shareSheetDismissed()
         }) { file in
             ActivityShareSheet(items: [file.url]) { completed in
                 viewModel.shareSheetFinished(completed: completed)
@@ -108,6 +108,10 @@ struct BackupView: View {
                 Text(viewModel.lastBackupDate.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "Nooit")
                     .foregroundStyle(viewModel.isBackupStale ? Theme.warning : Theme.textSecondary)
             }
+            Toggle("Backupherinnering tonen", isOn: Binding(
+                get: { !viewModel.isReminderDismissed },
+                set: { viewModel.setReminderEnabled($0) }
+            ))
             if viewModel.isBackupStale {
                 Label("Maak regelmatig een backup: bij opnieuw signen of een ingetrokken certificaat kan lokale data verloren gaan.",
                       systemImage: "exclamationmark.triangle.fill")
@@ -116,6 +120,8 @@ struct BackupView: View {
             }
         } header: {
             Text("Status")
+        } footer: {
+            Text("De herinnering verschijnt op het dashboard als de laatste backup ouder is dan 7 dagen.")
         }
     }
 
@@ -176,6 +182,12 @@ struct BackupView: View {
                     Label("Nu backuppen naar map", systemImage: "arrow.down.doc")
                 }
 
+                if let error = viewModel.lastAutoBackupError {
+                    Label("Laatste automatische backup mislukt: \(error)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.warning)
+                }
+
                 if let last = viewModel.lastAutoBackupDate {
                     HStack {
                         Text("Laatste automatische backup")
@@ -201,7 +213,9 @@ struct BackupView: View {
         } header: {
             Text("Automatische backup")
         } footer: {
-            Text("De app schrijft een backup naar de gekozen map (bijv. iCloud Drive of Op mijn iPhone) en bewaart daar de laatste \(BackupSettings.defaultKeepCount) automatische backups.")
+            Text(viewModel.hasAutoBackupFolder
+                 ? "De app schrijft bij het openen (of dagelijks) een backup naar de gekozen map en bewaart daar de laatste \(BackupSettings.defaultKeepCount) automatische backups."
+                 : "Staat uit tot je een map kiest (bijv. iCloud Drive of Op mijn iPhone). Na het kiezen wordt er direct een eerste backup gemaakt.")
         }
     }
 

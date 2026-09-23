@@ -32,6 +32,12 @@ public final class BackupSettings {
         public static let autoBackupFolderBookmark = "backup.autoBackupFolderBookmark"
         public static let autoBackupFolderName = "backup.autoBackupFolderName"
         public static let autoBackupKeepCount = "backup.autoBackupKeepCount"
+        /// `Bool`: de gebruiker heeft de backupherinnering bewust uitgezet.
+        /// Ook gelezen via `@AppStorage` door `BackupReminderBannerView`.
+        public static let reminderDismissed = "backup.reminderDismissed"
+        /// `String`: foutmelding van de laatste mislukte automatische backup;
+        /// leeg = laatste poging gelukt. Ook gelezen via `@AppStorage`.
+        public static let lastAutoBackupError = "backup.lastAutoBackupError"
     }
 
     /// Na zoveel tijd zonder backup toont de app een waarschuwing (SPEC §9).
@@ -60,10 +66,23 @@ public final class BackupSettings {
         set { defaults.set(newValue?.timeIntervalSince1970 ?? 0, forKey: Keys.lastAutoBackupDate) }
     }
 
+    /// Foutmelding van de laatste mislukte automatische backup (`nil` = geen).
+    public var lastAutoBackupError: String? {
+        get { defaults.string(forKey: Keys.lastAutoBackupError).flatMap { $0.isEmpty ? nil : $0 } }
+        set { defaults.set(newValue ?? "", forKey: Keys.lastAutoBackupError) }
+    }
+
     /// Registreert een geslaagde backup (handmatig of automatisch).
     public func recordBackup(at date: Date = Date(), automatic: Bool = false) {
         lastBackupDate = date
         if automatic { lastAutoBackupDate = date }
+    }
+
+    /// De gebruiker heeft de herinnering weggeklikt (en bevestigd dat hij
+    /// begrijpt dat backups belangrijk zijn). Terug aan te zetten in Backup & herstel.
+    public var isReminderDismissed: Bool {
+        get { defaults.bool(forKey: Keys.reminderDismissed) }
+        set { defaults.set(newValue, forKey: Keys.reminderDismissed) }
     }
 
     // MARK: - Automatische backup
@@ -101,6 +120,11 @@ public final class BackupSettings {
     public static func isStale(lastBackup: Date?, now: Date = Date()) -> Bool {
         guard let lastBackup else { return true }
         return now.timeIntervalSince(lastBackup) > staleInterval
+    }
+
+    /// Of de backupherinnering (dashboardbanner, icoon in Meer) getoond wordt.
+    public static func shouldShowReminder(lastBackup: Date?, dismissed: Bool, now: Date = Date()) -> Bool {
+        !dismissed && isStale(lastBackup: lastBackup, now: now)
     }
 
     public func isBackupStale(now: Date = Date()) -> Bool {

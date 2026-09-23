@@ -5,26 +5,63 @@ import SwiftUI
 /// Leest de datum rechtstreeks via `@AppStorage`, zodat de banner direct
 /// verdwijnt zodra er ergens in de app een backup gemaakt is. Tikken opent
 /// `BackupView`; de banner moet dus binnen een `NavigationStack` staan.
+/// Het kruisje zet de herinnering (na bevestiging) uit; weer aan te zetten
+/// in Backup & herstel.
 struct BackupReminderBannerView: View {
 
     @AppStorage(BackupSettings.Keys.lastBackupDate) private var lastBackupInterval: Double = 0
+    @AppStorage(BackupSettings.Keys.reminderDismissed) private var isDismissed = false
+    @AppStorage(BackupSettings.Keys.lastAutoBackupError) private var autoBackupError = ""
+
+    @State private var confirmDismiss = false
 
     private var lastBackup: Date? {
         lastBackupInterval > 0 ? Date(timeIntervalSince1970: lastBackupInterval) : nil
     }
 
     var isVisible: Bool {
-        BackupSettings.isStale(lastBackup: lastBackup)
+        BackupSettings.shouldShowReminder(lastBackup: lastBackup, dismissed: isDismissed)
     }
 
     var body: some View {
         if isVisible {
-            NavigationLink {
-                BackupView()
-            } label: {
-                content
+            HStack(alignment: .top, spacing: 8) {
+                NavigationLink {
+                    BackupView()
+                } label: {
+                    content
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    confirmDismiss = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Backupherinnering uitzetten")
             }
-            .buttonStyle(.plain)
+            .padding(Theme.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cornerRadius)
+                    .fill(Theme.warning.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.cornerRadius)
+                    .stroke(Theme.warning.opacity(0.4), lineWidth: 1)
+            )
+            .alert("Backupherinnering uitzetten?", isPresented: $confirmDismiss) {
+                Button("Ik begrijp het, uitzetten", role: .destructive) {
+                    isDismissed = true
+                }
+                Button("Annuleren", role: .cancel) { }
+            } message: {
+                Text("Backups zijn belangrijk: zonder backup kan al je data verloren gaan, bijvoorbeeld bij opnieuw signen, een ingetrokken certificaat of het verwijderen van de app. Je krijgt geen herinnering meer. Je kunt hem weer aanzetten in Meer → Backup & herstel.")
+            }
         }
     }
 
@@ -43,22 +80,14 @@ struct BackupReminderBannerView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.textTertiary)
         }
-        .padding(Theme.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius)
-                .fill(Theme.warning.opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius)
-                .stroke(Theme.warning.opacity(0.4), lineWidth: 1)
-        )
+        .contentShape(Rectangle())
     }
 
     private var detailText: String {
+        if !autoBackupError.isEmpty {
+            return "Automatische backup mislukt: \(autoBackupError) Tik om de backupmap te controleren."
+        }
         var text = "Bij opnieuw signen of een ingetrokken certificaat kan lokale data verloren gaan."
         if let lastBackup {
             text += " Laatste backup: \(lastBackup.formatted(date: .abbreviated, time: .shortened))."

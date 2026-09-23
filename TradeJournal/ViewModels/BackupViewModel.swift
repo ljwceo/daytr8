@@ -23,7 +23,14 @@ public final class BackupViewModel {
     public var errorMessage: String?
 
     /// Gezet na het maken van een backup/CSV → view toont de share sheet.
+    /// De sheet-binding zet hem weer op `nil` bij het sluiten.
     public var shareFile: ShareableFile?
+
+    /// Het gedeelde bestand tot de share sheet zijn resultaat meldt. Los van
+    /// `shareFile`: bij "Bewaar in Bestanden" sluit de sheet zichzelf en kan
+    /// SwiftUI's `onDismiss` vóór de completion-handler komen — die mag de
+    /// backup dan niet meer kwijt zijn.
+    private var inFlightShare: ShareableFile?
 
     /// Een ingelezen backup die op bevestiging wacht.
     public private(set) var pendingRestore: BackupService.LoadedBackup?
@@ -34,6 +41,8 @@ public final class BackupViewModel {
     public private(set) var lastAutoBackupDate: Date?
     public private(set) var autoBackupFolderName: String?
     public private(set) var autoBackupFrequency: AutoBackupFrequency
+    public private(set) var isReminderDismissed = false
+    public private(set) var lastAutoBackupError: String?
 
     private let settings: BackupSettings
     private let backupService: BackupService
@@ -57,6 +66,12 @@ public final class BackupViewModel {
         BackupSettings.isStale(lastBackup: lastBackupDate)
     }
 
+    /// Backupherinnering (banner op het dashboard) weer aan- of uitzetten.
+    public func setReminderEnabled(_ enabled: Bool) {
+        settings.isReminderDismissed = !enabled
+        isReminderDismissed = !enabled
+    }
+
     public var hasAutoBackupFolder: Bool { autoBackupFolderName != nil }
 
     // MARK: - Handmatige backup
@@ -64,21 +79,38 @@ public final class BackupViewModel {
     public func createBackup(from context: ModelContext) {
         perform {
             let url = try self.backupService.exportBackup(from: context)
-            self.shareFile = ShareableFile(url: url, kind: .backup)
+            self.present(ShareableFile(url: url, kind: .backup))
         }
     }
 
-    /// Aangeroepen als de share sheet sluit. Alleen een voltooide actie
-    /// (bijv. "Bewaar in Bestanden") telt als geslaagde backup.
+    /// Resultaat van de share sheet (completion-handler van
+    /// `UIActivityViewController`). Alleen een voltooide actie (bijv.
+    /// "Bewaar in Bestanden") telt als geslaagde backup. Werkt ongeacht of de
+    /// sheet al gesloten is (`shareSheetDismissed`).
     public func shareSheetFinished(completed: Bool) {
-        guard let file = shareFile else { return }
+        guard let file = inFlightShare else { return }
         if completed && file.kind == .backup {
             settings.recordBackup()
             statusMessage = "Backup bewaard."
             refreshFromSettings()
         }
         try? FileManager.default.removeItem(at: file.url)
+        inFlightShare = nil
         shareFile = nil
+    }
+
+    /// De sheet is gesloten. Het resultaat volgt via `shareSheetFinished`;
+    /// hier dus niets opruimen of als mislukt markeren.
+    public func shareSheetDismissed() {
+        shareFile = nil
+    }
+
+    private func present(_ file: ShareableFile) {
+        if let previous = inFlightShare, previous.url != file.url {
+            try? FileManager.default.removeItem(at: previous.url)
+        }
+        inFlightShare = file
+        shareFile = file
     }
 
     // MARK: - CSV-export
@@ -87,7 +119,7 @@ public final class BackupViewModel {
         perform {
             let trades = try context.fetch(FetchDescriptor<Trade>())
             let url = try self.csvExportService.exportFile(for: trades)
-            self.shareFile = ShareableFile(url: url, kind: .csv)
+            self.present(ShareableFile(url: url, kind: .csv))
         }
     }
 
@@ -130,14 +162,17 @@ public final class BackupViewModel {
         settings.autoBackupFrequency = frequency
     }
 
-    public func setAutoBackupFolder(_ url: URL) {
+    /// Slaat de gekozen map op en maakt er meteen een eerste backup in —
+    /// zo zie je direct of het werkt (anders pas bij de volgende app-start).
+    public func setAutoBackupFolder(_ url: URL, context: ModelContext) {
         perform {
+            defer { self.refreshFromSettings() }
             try self.autoBackupService.setFolder(url)
             if self.autoBackupFrequency == .off {
                 self.setAutoBackupFrequency(.daily)
             }
-            self.refreshFromSettings()
-            self.statusMessage = "Backupmap ingesteld: \(url.lastPathComponent)."
+            let backup = try self.autoBackupService.runNow(context: context)
+            self.statusMessage = "Backupmap ingesteld: \(url.lastPathComponent). Eerste backup opgeslagen als \(backup.lastPathComponent)."
         }
     }
 
@@ -149,8 +184,8 @@ public final class BackupViewModel {
 
     public func runAutoBackupNow(from context: ModelContext) {
         perform {
+            defer { self.refreshFromSettings() }
             let url = try self.autoBackupService.runNow(context: context)
-            self.refreshFromSettings()
             self.statusMessage = "Backup opgeslagen als \(url.lastPathComponent)."
         }
     }
@@ -160,6 +195,8 @@ public final class BackupViewModel {
     public func refreshFromSettings() {
         lastBackupDate = settings.lastBackupDate
         lastAutoBackupDate = settings.lastAutoBackupDate
+        isReminderDismissed = settings.isReminderDismissed
+        lastAutoBackupError = settings.lastAutoBackupError
         autoBackupFolderName = settings.autoBackupFolderBookmark == nil ? nil : settings.autoBackupFolderName
     }
 

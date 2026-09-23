@@ -26,6 +26,7 @@ struct MoreView: View {
     @Environment(AppLockViewModel.self) private var appLock
 
     @AppStorage(BackupSettings.Keys.lastBackupDate) private var lastBackupInterval: Double = 0
+    @AppStorage(BackupSettings.Keys.reminderDismissed) private var isReminderDismissed = false
 
     @State private var isBusy = false
     @State private var showingCSVImport = false
@@ -188,7 +189,10 @@ struct MoreView: View {
     }
 
     private var isBackupStale: Bool {
-        BackupSettings.isStale(lastBackup: lastBackupInterval > 0 ? Date(timeIntervalSince1970: lastBackupInterval) : nil)
+        BackupSettings.shouldShowReminder(
+            lastBackup: lastBackupInterval > 0 ? Date(timeIntervalSince1970: lastBackupInterval) : nil,
+            dismissed: isReminderDismissed
+        )
     }
 
     private func row(_ title: String, value: String) -> some View {
