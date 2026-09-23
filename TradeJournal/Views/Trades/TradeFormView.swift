@@ -15,6 +15,12 @@ struct TradeFormView: View {
     @State private var viewModel: TradeFormViewModel
     @State private var photoSelection: [PhotosPickerItem] = []
 
+    // Screenshot-import (OCR)
+    @State private var showingScreenshotSource = false
+    @State private var showingOCRPhotoPicker = false
+    @State private var ocrPhotoItem: PhotosPickerItem?
+    @State private var showingCamera = false
+
     @Query(sort: \Instrument.sortOrder) private var instruments: [Instrument]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
     @Query(sort: \Playbook.name) private var playbooks: [Playbook]
@@ -35,6 +41,9 @@ struct TradeFormView: View {
         NavigationStack {
             Form {
                 entryStylePicker
+                if !viewModel.mode.isEditing {
+                    screenshotImportSection
+                }
                 previewCard
                 if !viewModel.missingFields.isEmpty {
                     missingFieldsSection
@@ -78,6 +87,108 @@ struct TradeFormView: View {
                     .disabled(!viewModel.isValid)
                 }
             }
+            .confirmationDialog("Screenshot kiezen", isPresented: $showingScreenshotSource, titleVisibility: .visible) {
+                Button("Kies uit Foto's") { showingOCRPhotoPicker = true }
+                if CameraPickerView.isAvailable {
+                    Button("Maak een foto") { showingCamera = true }
+                }
+                Button("Annuleren", role: .cancel) { }
+            } message: {
+                Text("De tekst wordt op je toestel gelezen; er gaat niets naar internet.")
+            }
+            .photosPicker(isPresented: $showingOCRPhotoPicker, selection: $ocrPhotoItem, matching: .images)
+            .onChange(of: ocrPhotoItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        await viewModel.importScreenshot(data, instruments: instruments)
+                    } else {
+                        viewModel.ocrMessage = "De gekozen afbeelding kon niet geladen worden."
+                    }
+                    ocrPhotoItem = nil
+                }
+            }
+            .fullScreenCover(isPresented: $showingCamera) {
+                CameraPickerView { data in
+                    showingCamera = false
+                    guard let data else { return }
+                    Task { await viewModel.importScreenshot(data, instruments: instruments) }
+                }
+                .ignoresSafeArea()
+            }
+        }
+    }
+
+    // MARK: - Screenshot-import (OCR)
+
+    /// "Vul in vanuit screenshot" plus de status van de laatste import.
+    private var screenshotImportSection: some View {
+        Section {
+            Button {
+                showingScreenshotSource = true
+            } label: {
+                Label("Vul in vanuit screenshot", systemImage: "text.viewfinder")
+                    .foregroundStyle(Theme.accent)
+            }
+            .disabled(viewModel.isRecognizingScreenshot)
+
+            if viewModel.isRecognizingScreenshot {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Screenshot wordt gelezen…")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+
+            if let message = viewModel.ocrMessage {
+                let succeeded = !viewModel.ocrOrigins.isEmpty
+                Label(message, systemImage: succeeded ? "sparkles" : "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(succeeded ? Theme.textSecondary : Theme.warning)
+            }
+
+            if let pnlText = viewModel.ocrScreenshotPnLText {
+                Text(pnlText)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        } footer: {
+            if !viewModel.ocrOrigins.isEmpty {
+                HStack(spacing: 12) {
+                    Label("uit OCR", systemImage: "sparkles")
+                    Label("berekend", systemImage: "function")
+                }
+                .font(.caption)
+                .foregroundStyle(Theme.textTertiary)
+            }
+        }
+    }
+
+    /// Klein icoon achter een veld dat de screenshot-import heeft ingevuld.
+    @ViewBuilder
+    private func ocrBadge(_ field: ScreenshotField) -> some View {
+        if let origin = viewModel.ocrOrigin(for: field) {
+            Image(systemName: origin == .recognized ? "sparkles" : "function")
+                .font(.caption)
+                .foregroundStyle(Theme.accent)
+                .accessibilityLabel(origin == .recognized ? "Uit OCR, controleer" : "Berekend uit OCR, controleer")
+        }
+    }
+
+    /// Chip-rij met alternatieven als de screenshot meerdere kandidaten had.
+    @ViewBuilder
+    private func ocrAlternatives(_ field: ScreenshotField) -> some View {
+        let candidates = viewModel.ocrCandidates(for: field)
+        if !candidates.isEmpty {
+            FlowLayout(spacing: 8) {
+                ForEach(candidates) { candidate in
+                    ChipView(title: candidate.label, color: Theme.accent, isSelected: candidate.isSelected) {
+                        viewModel.selectOCRCandidate(candidate.id, for: field)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 
@@ -144,8 +255,7 @@ struct TradeFormView: View {
                     Text("\(instrument.symbol) — \(instrument.name)").tag(Optional(instrument))
                 }
             }
-            TextField("Symbool", text: $viewModel.values.symbol)
-                .textInputAutocapitalization(.characters)
+            symbolField
         }
 
         Section("Resultaat") {
@@ -154,14 +264,9 @@ struct TradeFormView: View {
                 Text("Verlies").tag(false)
             }
             .pickerStyle(.segmented)
-            numberRow("Bedrag ($)", value: $viewModel.quickAmount)
-            Picker("Richting", selection: $viewModel.values.direction) {
-                ForEach(TradeDirection.allCases) { direction in
-                    Text(direction.displayName).tag(direction)
-                }
-            }
-            .pickerStyle(.segmented)
-            DatePicker("Datum", selection: $viewModel.values.entryDate)
+            numberRow("Bedrag ($)", value: $viewModel.quickAmount, ocrField: .netPnL)
+            directionPicker
+            entryDatePicker("Datum")
         }
 
         confluencesSection
@@ -206,10 +311,47 @@ struct TradeFormView: View {
                     Text("\(instrument.symbol) — \(instrument.name)").tag(Optional(instrument))
                 }
             }
-            TextField("Symbool", text: $viewModel.values.symbol)
-                .textInputAutocapitalization(.characters)
+            symbolField
             numberRow("Tick size", value: $viewModel.values.tickSize)
             numberRow("Tick value ($)", value: $viewModel.values.tickValue)
+        }
+    }
+
+    private var symbolField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TextField("Symbool", text: $viewModel.values.symbol)
+                    .textInputAutocapitalization(.characters)
+                ocrBadge(.symbol)
+            }
+            ocrAlternatives(.symbol)
+        }
+    }
+
+    private var directionPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Picker("Richting", selection: $viewModel.values.direction) {
+                    ForEach(TradeDirection.allCases) { direction in
+                        Text(direction.displayName).tag(direction)
+                    }
+                }
+                .pickerStyle(.segmented)
+                ocrBadge(.direction)
+            }
+            ocrAlternatives(.direction)
+        }
+    }
+
+    private func entryDatePicker(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DatePicker(selection: $viewModel.values.entryDate) {
+                HStack(spacing: 6) {
+                    Text(title)
+                    ocrBadge(.entryTime)
+                }
+            }
+            ocrAlternatives(.entryTime)
         }
     }
 
@@ -228,19 +370,22 @@ struct TradeFormView: View {
 
     private var timingSection: some View {
         Section("Richting & tijden") {
-            Picker("Richting", selection: $viewModel.values.direction) {
-                ForEach(TradeDirection.allCases) { direction in
-                    Text(direction.displayName).tag(direction)
-                }
-            }
-            .pickerStyle(.segmented)
+            directionPicker
 
-            DatePicker("Entry", selection: $viewModel.values.entryDate)
+            entryDatePicker("Entry")
 
             Toggle("Trade is gesloten", isOn: closedBinding)
 
             if viewModel.values.exitDate != nil {
-                DatePicker("Exit", selection: exitDateBinding)
+                VStack(alignment: .leading, spacing: 6) {
+                    DatePicker(selection: exitDateBinding) {
+                        HStack(spacing: 6) {
+                            Text("Exit")
+                            ocrBadge(.exitTime)
+                        }
+                    }
+                    ocrAlternatives(.exitTime)
+                }
             }
         }
     }
@@ -271,13 +416,13 @@ struct TradeFormView: View {
 
     private var pricesSection: some View {
         Section("Prijzen & risk") {
-            numberRow("Entry-prijs", value: $viewModel.values.entryPrice)
+            numberRow("Entry-prijs", value: $viewModel.values.entryPrice, ocrField: .entryPrice)
             if viewModel.values.exitDate != nil {
-                numberRow("Exit-prijs", value: exitPriceBinding)
+                numberRow("Exit-prijs", value: exitPriceBinding, ocrField: .exitPrice)
             }
-            numberRow("Aantal contracten/lots", value: $viewModel.values.quantity)
-            numberRow("Stop loss", value: optionalDoubleBinding(\.stopLoss))
-            numberRow("Take profit", value: optionalDoubleBinding(\.takeProfit))
+            numberRow("Aantal contracten/lots", value: $viewModel.values.quantity, ocrField: .quantity)
+            numberRow("Stop loss", value: optionalDoubleBinding(\.stopLoss), ocrField: .stopLoss)
+            numberRow("Take profit", value: optionalDoubleBinding(\.takeProfit), ocrField: .takeProfit)
             numberRow("Geplande risk ($)", value: optionalDoubleBinding(\.plannedRisk))
             numberRow("MAE", value: optionalDoubleBinding(\.mae))
             numberRow("MFE", value: optionalDoubleBinding(\.mfe))
@@ -302,20 +447,29 @@ struct TradeFormView: View {
 
     private var costsSection: some View {
         Section("Kosten") {
-            numberRow("Commissie", value: $viewModel.values.commission)
-            numberRow("Fees", value: $viewModel.values.fees)
+            numberRow("Commissie", value: $viewModel.values.commission, ocrField: .commission)
+            numberRow("Fees", value: $viewModel.values.fees, ocrField: .fees)
         }
     }
 
-    private func numberRow(_ title: String, value: Binding<Double>) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(Theme.textPrimary)
-            Spacer()
-            DecimalFieldView(title: title, value: value)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(Theme.textPrimary)
+    /// Getalrij; met `ocrField` ook het "uit OCR"-icoon en eventuele alternatieven.
+    private func numberRow(_ title: String, value: Binding<Double>, ocrField: ScreenshotField? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .foregroundStyle(Theme.textPrimary)
+                if let ocrField {
+                    ocrBadge(ocrField)
+                }
+                Spacer()
+                DecimalFieldView(title: title, value: value)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            if let ocrField {
+                ocrAlternatives(ocrField)
+            }
         }
     }
 

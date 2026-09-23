@@ -29,6 +29,13 @@ targets:
       - path: TradeJournal
         excludes:
           - "Resources/Info.plist"
+          - "Resources/ScreenshotTemplates"
+          - "Resources/ScreenshotTemplates/**"
+      # Broker-templates voor de screenshot-import als folder reference, zodat
+      # ze als map in de bundle staan en nieuwe .json's vanzelf meekomen.
+      - path: TradeJournal/Resources/ScreenshotTemplates
+        type: folder
+        buildPhase: resources
     resources:
       - TradeJournal/Resources/Assets.xcassets
     info:
@@ -50,9 +57,9 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIUserInterfaceStyle: Dark
-        NSPhotoLibraryUsageDescription: TradeJournal gebruikt je fotobibliotheek om screenshots aan je trades te koppelen.
+        NSPhotoLibraryUsageDescription: TradeJournal gebruikt je fotobibliotheek om screenshots aan je trades te koppelen en er, op je toestel, tradegegevens uit te lezen.
         NSPhotoLibraryAddUsageDescription: TradeJournal slaat screenshots op in je fotobibliotheek wanneer je dat kiest.
-        NSCameraUsageDescription: TradeJournal gebruikt de camera om screenshots van je charts direct aan je trades toe te voegen.
+        NSCameraUsageDescription: TradeJournal gebruikt de camera om foto's van je charts en platform direct aan je trades toe te voegen en er, op je toestel, tradegegevens uit te lezen.
         NSFaceIDUsageDescription: TradeJournal gebruikt Face ID om je journal te beveiligen wanneer je de app-vergrendeling inschakelt.
     settings:
       base:

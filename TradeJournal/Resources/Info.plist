@@ -45,11 +45,11 @@
     <key>UIUserInterfaceStyle</key>
     <string>Dark</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>TradeJournal gebruikt je fotobibliotheek om screenshots aan je trades te koppelen.</string>
+    <string>TradeJournal gebruikt je fotobibliotheek om screenshots aan je trades te koppelen en er, op je toestel, tradegegevens uit te lezen.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>TradeJournal slaat screenshots op in je fotobibliotheek wanneer je dat kiest.</string>
     <key>NSCameraUsageDescription</key>
-    <string>TradeJournal gebruikt de camera om screenshots van je charts direct aan je trades toe te voegen.</string>
+    <string>TradeJournal gebruikt de camera om foto's van je charts en platform direct aan je trades toe te voegen en er, op je toestel, tradegegevens uit te lezen.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>TradeJournal gebruikt Face ID om je journal te beveiligen wanneer je de app-vergrendeling inschakelt.</string>
 </dict>
