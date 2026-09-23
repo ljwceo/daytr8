@@ -36,23 +36,21 @@ jobs:
         id: sim
         run: |
           set -euo pipefail
-          UDID=$(xcrun simctl list devices available -j | python3 - <<'PY'
-          import json, sys
-          data = json.load(sys.stdin)["devices"]
-          # Sort iOS runtimes newest first, pick the first available iPhone.
-          runtimes = sorted(
-              (rt for rt in data if "SimRuntime.iOS-" in rt),
-              key=lambda rt: [int(p) for p in rt.split("iOS-", 1)[1].split("-")],
-              reverse=True,
-          )
-          for rt in runtimes:
-              for dev in data[rt]:
-                  if dev.get("isAvailable") and dev.get("name", "").startswith("iPhone"):
-                      print(dev["udid"])
-                      sys.exit(0)
-          sys.exit("No available iPhone simulator found")
-          PY
-          )
+          # Nieuwste iOS-runtime eerst (lex-sort werkt voor iOS 17..26), dan
+          # de eerste beschikbare iPhone daaruit.
+          UDID=$(xcrun simctl list devices available -j | jq -r '
+            [ .devices | to_entries[]
+              | select(.key | test("SimRuntime\\.iOS-")) ]
+            | sort_by(.key) | reverse
+            | .[].value[]?
+            | select(.isAvailable and (.name | startswith("iPhone")))
+            | .udid
+          ' | head -n 1)
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "Geen beschikbare iPhone-simulator gevonden." >&2
+            xcrun simctl list devices available >&2 || true
+            exit 1
+          fi
           echo "Using simulator UDID: $UDID"
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
