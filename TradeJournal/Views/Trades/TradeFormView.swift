@@ -37,6 +37,12 @@ struct TradeFormView: View {
                 previewCard
                 if !viewModel.missingFields.isEmpty {
                     missingFieldsSection
+                } else if viewModel.hasNoPrices {
+                    Section {
+                        Label("Zonder entry- en exit-prijs wordt de trade opgeslagen, maar telt hij niet mee in P&L en win rate.", systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
                 accountSection
                 instrumentSection
@@ -186,7 +192,7 @@ struct TradeFormView: View {
             set: { isClosed in
                 if isClosed {
                     viewModel.values.exitDate = max(viewModel.values.entryDate, Date())
-                    if viewModel.values.exitPrice == nil {
+                    if viewModel.values.exitPrice == nil, viewModel.values.entryPrice != 0 {
                         viewModel.values.exitPrice = viewModel.values.entryPrice
                     }
                 } else {

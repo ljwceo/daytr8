@@ -72,13 +72,25 @@ public final class TradeFormViewModel {
 
     /// Wat er nog ontbreekt om te kunnen opslaan — getoond in het formulier,
     /// zodat een uitgeschakelde "Opslaan"-knop niet raadselachtig is.
+    ///
+    /// Alleen het symbool is echt verplicht: een trade mag ook zonder prijzen
+    /// (snel iets vastleggen). Wel: een exit-prijs zonder entry-prijs zou een
+    /// absurde P&L opleveren, dus dan is de entry-prijs verplicht.
     public var missingFields: [String] {
         var missing: [String] = []
         if values.symbol.trimmingCharacters(in: .whitespaces).isEmpty { missing.append("Symbool (of kies een preset)") }
-        if values.entryPrice == 0 { missing.append("Entry-prijs") }
+        if values.entryPrice == 0, let exit = values.exitPrice, exit != 0 {
+            missing.append("Entry-prijs (nodig als je een exit-prijs invult)")
+        }
         if values.quantity <= 0 { missing.append("Aantal contracten/lots groter dan 0") }
         if values.tickSize <= 0 { missing.append("Tick size groter dan 0") }
         return missing
+    }
+
+    /// Trade zonder prijzen: wordt opgeslagen maar telt niet mee in P&L en
+    /// win rate (geen exit-prijs → geen resultaat).
+    public var hasNoPrices: Bool {
+        values.entryPrice == 0 && (values.exitPrice ?? 0) == 0
     }
 
     /// Screenshots die al bij de trade horen (alleen relevant bij bewerken).
@@ -199,6 +211,10 @@ public final class TradeFormViewModel {
     /// bestaande bij, en voegt eventuele nieuwe screenshots toe.
     @discardableResult
     public func save(in context: ModelContext) -> Trade {
+        // Zonder prijzen geen exit-prijs van 0 opslaan: dat zou als breakeven
+        // meetellen in de win rate. Zonder exit-prijs telt de trade niet mee.
+        if hasNoPrices { values.exitPrice = nil }
+
         let trade: Trade
         switch mode {
         case .create:

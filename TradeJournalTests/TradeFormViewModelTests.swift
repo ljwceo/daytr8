@@ -21,32 +21,36 @@ final class TradeFormViewModelTests: XCTestCase {
 
     // MARK: - Validatie
 
-    func test_isValid_falseWithoutSymbolOrPrice() {
+    func test_isValid_falseWithoutSymbol_trueWithOnlySymbol() {
         let viewModel = TradeFormViewModel(mode: .create)
         XCTAssertFalse(viewModel.isValid)
 
         viewModel.values.symbol = "NQ"
-        XCTAssertFalse(viewModel.isValid, "Entry-prijs is nog 0")
-
-        viewModel.values.entryPrice = 18_000
-        XCTAssertTrue(viewModel.isValid)
+        XCTAssertTrue(viewModel.isValid, "Alleen het symbool is verplicht")
     }
 
     // MARK: - Live preview
 
-    func test_missingFields_listsWhatIsNeeded() {
+    func test_missingFields_onlySymbolIsRequired() {
         let viewModel = TradeFormViewModel(mode: .create)
         viewModel.values.symbol = ""
         viewModel.values.entryPrice = 0
-        viewModel.values.quantity = 0
-        viewModel.values.tickSize = 0
-        XCTAssertEqual(viewModel.missingFields.count, 4)
+        viewModel.values.exitPrice = nil
+        XCTAssertEqual(viewModel.missingFields, ["Symbool (of kies een preset)"])
 
         viewModel.values.symbol = "NQ"
+        XCTAssertTrue(viewModel.isValid)
+        XCTAssertTrue(viewModel.hasNoPrices)
+    }
+
+    func test_missingFields_exitPriceRequiresEntryPrice() {
+        let viewModel = TradeFormViewModel(mode: .create)
+        viewModel.values.symbol = "NQ"
+        viewModel.values.entryPrice = 0
+        viewModel.values.exitPrice = 18_010
+        XCTAssertFalse(viewModel.isValid)
+
         viewModel.values.entryPrice = 18_000
-        viewModel.values.quantity = 1
-        viewModel.values.tickSize = 0.25
-        XCTAssertTrue(viewModel.missingFields.isEmpty)
         XCTAssertTrue(viewModel.isValid)
     }
 
