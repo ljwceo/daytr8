@@ -10,6 +10,10 @@ De volledige productspec staat in [`SPEC.md`](SPEC.md). De voortgang per fase in
 
 - Native iOS-app in **Swift 5.10+ / SwiftUI**, iOS **17.0+**.
 - Volledig **offline**: geen backend, geen accounts, geen login, geen analytics.
+  Enige uitzondering: de live-koerskaart op het dashboard haalt koersen op bij
+  Yahoo Finance (`Services/LiveQuoteService.swift`, alleen het symbool gaat
+  over de lijn, uit te zetten onder Meer → Live koers). Geen API-keys in code;
+  configuratie via Info.plist (`LiveQuoteBaseURL`).
 - **Geen** capabilities die een betaald Apple Developer Program vereisen:
   - géén iCloud / CloudKit
   - géén push notifications
@@ -121,7 +125,17 @@ Regels:
   sessie-detectie in `Services/SessionCalculator.swift`. Voeg nieuwe berekeningen
   daar toe en dek ze af met unit tests.
 - Standaarddata (instrumentpresets, confluence-set) worden idempotent
-  ingeschoten door `Services/SeedService.swift` bij elke app-start.
+  ingeschoten door `Services/SeedService.swift` bij elke app-start — alleen
+  als er nog niets is; nooit over gebruikersdata heen.
+- De store wordt geopend door `Services/PersistenceController.swift` met
+  `AppMigrationPlan` (`Models/AppSchema.swift`). Een model wijzigen op een
+  manier die SwiftData niet zelf kan migreren? Voeg een nieuwe
+  `AppSchemaVn` + `MigrationStage` toe; nooit de store-locatie wijzigen.
+- Instellingen in `UserDefaults`: sleutel hernoemen of waardevorm wijzigen →
+  migratie in `Services/SettingsMigrator.swift`; nieuwe instelling die in de
+  backup hoort → `SettingsMigrator.backedUpKeys`.
+- Maand-/dag-/weektotalen (kalender, doelen, limieten) altijd via
+  `CalendarAggregationService` (`dayAggregates` / `netPnL(of:in:)`).
 - Backup-/import-/export-formaat: JSON + losse afbeeldingen, verpakt in `.zip`.
   Houd het versienummer van het formaat in de payload op zodat migraties mogelijk zijn.
 
