@@ -2,6 +2,7 @@ import XCTest
 import SwiftUI
 @testable import TradeJournal
 
+@MainActor
 final class Daytr8LogoTests: XCTestCase {
 
     /// WCAG: grafische elementen ≥ 3:1, tekst ≥ 4,5:1.
