@@ -1024,6 +1024,92 @@ en leek de automatische backup niets te doen.
   dagelijks + backup terug te lezen, mislukte backup → fout bewaard en gewist)
   en extra `BackupSettingsTests`.
 
+## Onboarding en themasysteem
+
+Doel: nieuwe gebruikers wegwijs maken (welkomstmelding + rondleiding) en het
+uiterlijk aanpasbaar maken met centrale kleurtokens.
+
+### Welkomstmelding en rondleiding
+- `Services/OnboardingSettings.swift` (nieuw) — vlag `hasSeenOnboarding` in
+  `UserDefaults` (sleutel `onboarding.hasSeenOnboarding`), `reset()`.
+- `ViewModels/OnboardingViewModel.swift` (nieuw) — app-breed (environment):
+  `handleLaunch()` toont de melding alleen bij de eerste start en zet de vlag
+  meteen (tweede start: geen melding); rondleiding starten/volgende/overslaan;
+  afsluiten naar het dashboard of "Eerste trade toevoegen" (Trades-tab +
+  tradeformulier, pas ná de sluitanimatie); geselecteerde tab.
+- `Models/AppTab.swift` (nieuw) — de vijf tabs; bron voor `RootTabView` én
+  de navigatiestap. `Models/OnboardingStep.swift` (nieuw) — 7 stappen.
+- `Views/Onboarding/WelcomeBannerView.swift` (nieuw) — in-app melding in
+  pushmelding-stijl bovenin (geen systeemnotificatie): tik = rondleiding,
+  kruisje of omhoog vegen = sluiten, verdwijnt na 10 s vanzelf; verschijnt pas
+  na ontgrendelen van het app-slot.
+- `Views/Onboarding/OnboardingView.swift` (nieuw) — swipebare carousel met
+  voortgangsbolletjes, Volgende/Overslaan: Welkom, Navigatie (nagebootste
+  tabbalk, tik per tab), Confluences (aanvinkbare voorbeelden + sterktemeter,
+  waar je ze vindt), Thema's (live kiezen), Trade toevoegen (genummerde
+  stappen op basis van de echte formuliervelden), Screenshot-import
+  (voorbeeld), Klaar (Eerste trade toevoegen / Naar dashboard).
+- `Views/RootTabView.swift` — tabselectie via `AppTab`, melding als overlay
+  (binnen de safe area), rondleiding als full-screen cover.
+- `Views/Trades/TradesView.swift` — opent het tradeformulier op verzoek van
+  de rondleiding. `Views/More/MoreView.swift` — Instellingen → Thema en
+  "Rondleiding opnieuw bekijken".
+- `App/TradeJournalApp.swift` — `OnboardingViewModel` in de environment,
+  `handleLaunch()` bij de start.
+
+### Themasysteem
+- `Utilities/ThemePalette.swift` (nieuw) — tokens per thema (achtergrond,
+  kaart/oppervlak, verhoogd, tekst primair/secundair/tertiair, accent,
+  tekst-op-accent, winst, verlies, neutraal, waarschuwing; rand = tekstkleur
+  op lage dekking) en WCAG-contrastberekening. Paletten — Effen: Donker
+  (antraciet, standaard), Licht, Middernachtblauw, Bosgroen; Pastel:
+  Lavendel, Mint, Perzik, Babyblauw.
+- `Services/ThemeStore.swift` (nieuw) — `@Observable`, bewaart de keuze in
+  `UserDefaults` (`theme.selectedPaletteID`).
+- `Utilities/Theme.swift` — kleuren zijn nu computed properties op het
+  actieve palet. Omdat de store `@Observable` is, hertekenen alle bestaande
+  views live bij een themawissel zonder aanpassing. Nieuw: `Theme.onAccent`,
+  `Theme.border`, `Theme.shadow`, `Theme.colorScheme`.
+- `RootTabView` zet `preferredColorScheme` op basis van het thema (lichte
+  paletten → light mode voor system-controls); `.preferredColorScheme(.dark)`
+  is uit `TradeJournalApp` gehaald.
+- `Views/Components/ThemePickerView.swift` (nieuw) — kleurstalen per groep met
+  live preview (mini-dashboard met winst/verlies en knop); gebruikt in
+  `Views/More/ThemeSettingsView.swift` (nieuw) en de onboarding.
+- `ChipView` — optionele `selectedForeground`; accent-chips gebruiken
+  `Theme.onAccent` zodat geselecteerde tekst in elk thema leesbaar is.
+  `DayDetailView` — "Journal opslaan" gebruikt `Theme.onAccent` i.p.v. wit.
+
+### Voorbeeld-screenshot
+- `Views/Components/ScreenshotExampleView.swift` (nieuw) — fictief platform
+  ("Voorbeeldplatform", ticker EXMPL, Long, entry 142,50, exit 145,20, aantal
+  100, 09:35 → 10:12, P&L +€270) met gemarkeerde velden en labels ("dit wordt
+  Entry" …) plus checklist en tip. Ook als sheet via de nieuwe "?"-knop naast
+  "Vul in vanuit screenshot" in `TradeFormView`.
+
+### Teksten
+- `Utilities/AppStrings.swift` (nieuw) — alle teksten van melding,
+  rondleiding, thema's en het screenshot-voorbeeld op één plek.
+
+### Tests
+- `OnboardingTests` — eerste start toont de melding, tweede start niet;
+  wegklikken; tik opent stap 1; opnieuw bekijken via Instellingen begint bij
+  stap 1; reset van de vlag; laatste stap; afsluiten naar dashboard / eerste
+  trade (één keer); overslaan houdt de tab; navigatiestap dekt alle tabs.
+- `ThemeStoreTests` — standaardthema, keuze blijft bewaard na "herstart"
+  (nieuwe store op dezelfde defaults), onbekende id → standaard, alle
+  gevraagde paletten aanwezig, contrastformule, **alle paletten halen WCAG AA**
+  (tekst, accent, winst, verlies ≥ 4,5:1 op achtergrond, kaart én verhoogd;
+  tertiair/neutraal/waarschuwing ≥ 3:1; tekst op accent ≥ 4,5:1), winst en
+  verlies blijven groen resp. rood.
+
+### Openstaand
+- System-rijen in `List`/`Form` zonder eigen `listRowBackground` volgen het
+  color scheme (wit in lichte thema's, grijs in donkere), niet de exacte
+  kaartkleur van het palet.
+- Het app-slotscherm krijgt de tint van een nieuw thema pas na een herstart.
+- Nog niet op het toestel getest.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
