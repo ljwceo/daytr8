@@ -1,45 +1,63 @@
 import SwiftUI
 
 /// Centrale kleuren en styling voor de TradeJournal-app.
-/// Alle views gebruiken deze constants zodat een themawijziging op één plek gebeurt.
+/// Alle views gebruiken deze tokens zodat een themawijziging op één plek gebeurt.
+///
+/// De kleuren komen uit het actieve `ThemePalette` (`ThemeStore.shared`).
+/// Omdat de store `@Observable` is, tekenen views die deze kleuren in `body`
+/// lezen vanzelf opnieuw zodra de gebruiker een ander thema kiest.
 enum Theme {
+
+    private static var palette: ThemePalette { ThemeStore.shared.palette }
 
     // MARK: - Basiskleuren
 
-    /// Achtergrond van het hoofdscherm (donker, bijna zwart).
-    static let background = Color(red: 0.05, green: 0.06, blue: 0.08)
+    /// Achtergrond van het hoofdscherm.
+    static var background: Color { palette.background.color }
 
-    /// Achtergrond van kaarten en secties, iets lichter dan `background`.
-    static let card = Color(red: 0.10, green: 0.11, blue: 0.14)
+    /// Achtergrond van kaarten en secties (oppervlak), iets af van `background`.
+    static var card: Color { palette.card.color }
 
-    /// Extra hoge oppervlakken (modals, popovers).
-    static let elevated = Color(red: 0.14, green: 0.15, blue: 0.18)
+    /// Extra hoge oppervlakken (modals, popovers, chips).
+    static var elevated: Color { palette.elevated.color }
 
-    /// Subtiele scheidingslijnen.
-    static let separator = Color.white.opacity(0.08)
+    /// Subtiele scheidingslijnen en randen.
+    static var separator: Color { palette.textPrimary.color.opacity(palette.borderOpacity) }
+
+    /// Rand rond kaarten/stalen; zelfde token als `separator`.
+    static var border: Color { separator }
 
     // MARK: - Semantische kleuren
 
     /// Winst / positief resultaat.
-    static let profit = Color(red: 0.15, green: 0.78, blue: 0.45)
+    static var profit: Color { palette.profit.color }
 
     /// Verlies / negatief resultaat.
-    static let loss = Color(red: 0.94, green: 0.31, blue: 0.36)
+    static var loss: Color { palette.loss.color }
 
     /// Neutraal / breakeven.
-    static let neutral = Color(red: 0.60, green: 0.62, blue: 0.68)
+    static var neutral: Color { palette.neutral.color }
 
     /// Accentkleur voor knoppen, actieve tab, links.
-    static let accent = Color(red: 0.30, green: 0.68, blue: 1.00)
+    static var accent: Color { palette.accent.color }
+
+    /// Tekst en iconen op een accentvlak (bijv. primaire knop).
+    static var onAccent: Color { palette.onAccent.color }
 
     /// Waarschuwing (bijv. dicht bij daily loss limit).
-    static let warning = Color(red: 1.00, green: 0.72, blue: 0.20)
+    static var warning: Color { palette.warning.color }
 
     // MARK: - Tekstkleuren
 
-    static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.72)
-    static let textTertiary = Color.white.opacity(0.48)
+    static var textPrimary: Color { palette.textPrimary.color }
+    static var textSecondary: Color { palette.textSecondary.color }
+    static var textTertiary: Color { palette.textTertiary.color }
+
+    /// Schaduw onder zwevende elementen (bijv. de welkomstmelding).
+    static var shadow: Color { Color.black.opacity(palette.isDark ? 0.45 : 0.15) }
+
+    /// Color scheme dat bij het actieve thema hoort (voor system-controls).
+    static var colorScheme: ColorScheme { palette.colorScheme }
 
     // MARK: - Metrics
 

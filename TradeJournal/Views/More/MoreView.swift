@@ -9,7 +9,8 @@ import SwiftData
 /// - Trading: beheer van confluences (toevoegen, bewerken, archiveren,
 ///   verwijderen).
 /// - Instellingen (fase 6): journal-herinnering en app-slot; fase 7:
-///   overzicht van de screenshot-templates.
+///   overzicht van de screenshot-templates; thema en "Rondleiding opnieuw
+///   bekijken" (onboarding).
 /// - Data: backup & herstel (incl. automatische backup en CSV-export) en
 ///   CSV-import (fase 5).
 /// - Debug-tools uit fase 1: standaarddata seeden, ~2 jaar voorbeelddata
@@ -24,6 +25,7 @@ struct MoreView: View {
     @Query private var instruments: [Instrument]
 
     @Environment(AppLockViewModel.self) private var appLock
+    @Environment(OnboardingViewModel.self) private var onboarding
 
     @AppStorage(BackupSettings.Keys.lastBackupDate) private var lastBackupInterval: Double = 0
     @AppStorage(BackupSettings.Keys.reminderDismissed) private var isReminderDismissed = false
@@ -81,6 +83,16 @@ struct MoreView: View {
                     }
 
                     Section("Instellingen") {
+                        NavigationLink {
+                            ThemeSettingsView()
+                        } label: {
+                            Label(AppStrings.Themes.settingsTitle, systemImage: "paintpalette")
+                        }
+                        Button {
+                            onboarding.startTour()
+                        } label: {
+                            Label(AppStrings.Settings.replayTour, systemImage: "sparkles")
+                        }
                         NavigationLink {
                             ReminderSettingsView()
                         } label: {
@@ -218,6 +230,7 @@ struct MoreView: View {
 #Preview {
     MoreView()
         .environment(AppLockViewModel())
+        .environment(OnboardingViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }

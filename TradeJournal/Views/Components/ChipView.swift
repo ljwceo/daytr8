@@ -7,6 +7,9 @@ struct ChipView: View {
     let title: String
     var systemImage: String?
     var color: Color = Theme.accent
+    /// Tekstkleur als de chip geselecteerd is; `nil` = `Theme.textPrimary`.
+    /// Geef `Theme.onAccent` mee bij accent-chips, zodat de tekst in elk thema leesbaar blijft.
+    var selectedForeground: Color? = nil
     let isSelected: Bool
     /// `nil` maakt de chip niet-interactief (alleen-lezen weergave, zoals in tradedetail).
     var action: (() -> Void)? = nil
@@ -15,7 +18,7 @@ struct ChipView: View {
         content
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .foregroundStyle(Theme.textPrimary)
+            .foregroundStyle(isSelected ? (selectedForeground ?? Theme.textPrimary) : Theme.textPrimary)
             .background(isSelected ? color.opacity(0.85) : Theme.elevated)
             .clipShape(Capsule())
             .overlay(
@@ -47,10 +50,9 @@ struct ChipView: View {
 
 #Preview {
     HStack {
-        ChipView(title: "Sweep PDL", systemImage: "arrow.down.right", color: Theme.accent, isSelected: true) {}
+        ChipView(title: "Sweep PDL", systemImage: "arrow.down.right", color: Theme.accent, selectedForeground: Theme.onAccent, isSelected: true) {}
         ChipView(title: "IFVG", color: Theme.profit, isSelected: false) {}
     }
     .padding()
     .background(Theme.background)
-    .preferredColorScheme(.dark)
 }

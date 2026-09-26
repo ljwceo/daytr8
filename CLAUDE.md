@@ -85,10 +85,17 @@ Regels:
 
 ## 5. Styling & thema
 
-- **Dark mode is standaard**. Zet `.preferredColorScheme(.dark)` alleen op de root;
-  losse views doen het niet zelf.
+- **Themasysteem**: de gebruiker kiest een thema (Meer → Thema); standaard is
+  *Donker*. Paletten staan in `Utilities/ThemePalette.swift`, de keuze in
+  `Services/ThemeStore.swift`. Alleen `RootTabView` zet
+  `.preferredColorScheme(Theme.colorScheme)`; losse views doen het niet zelf.
 - Gebruik altijd `Theme` uit `Utilities/Theme.swift` voor kleuren, hoekradii en
-  paddings. **Geen** hardcoded `Color(...)` of magic numbers in views.
+  paddings. **Geen** hardcoded `Color(...)` of magic numbers in views. Lees
+  `Theme`-kleuren in `body` (niet cachen in een `let`/viewmodel), anders
+  tekent een view niet mee bij een themawissel.
+- Nieuw palet of nieuwe token? Voeg hem toe aan **alle** paletten;
+  `ThemeStoreTests` controleert WCAG AA-contrast.
+- Tekst op een accentvlak: `Theme.onAccent` (niet wit).
 - Semantiek:
   - `Theme.profit` (groen) voor winst / positief resultaat
   - `Theme.loss` (rood) voor verlies / negatief resultaat
