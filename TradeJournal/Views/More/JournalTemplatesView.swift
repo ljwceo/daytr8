@@ -57,6 +57,7 @@ struct JournalTemplatesView: View {
                     } header: {
                         Text(kind.displayName)
                     }
+                    .listRowBackground(Theme.card)
                 }
 
                 Section {
@@ -64,6 +65,7 @@ struct JournalTemplatesView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
         }
@@ -123,11 +125,13 @@ private struct JournalTemplateEditorView: View {
                 Section("Naam") {
                     TextField("Naam", text: $name)
                 }
+                .listRowBackground(Theme.card)
                 Section("Template") {
                     TextField("Vragen / kopjes…", text: $bodyText, axis: .vertical)
                         .lineLimit(8...40)
                         .font(.body.monospaced())
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)

@@ -31,6 +31,7 @@ struct AccountFormView: View {
                     }
                     numberRow("Startbalans", value: $viewModel.draft.startingBalance)
                 }
+                .listRowBackground(Theme.card)
 
                 Section {
                     numberRow("Maandelijks P&L-doel", value: optionalBinding(\.monthlyProfitTarget))
@@ -41,6 +42,7 @@ struct AccountFormView: View {
                 } footer: {
                     Text("Laat op 0 om niet in te stellen. Het dashboard waarschuwt vanaf \(Int(GoalsService.defaultWarningFraction * 100))% van een limiet.")
                 }
+                .listRowBackground(Theme.card)
 
                 if viewModel.draft.type == .backtest {
                     Section {
@@ -48,12 +50,14 @@ struct AccountFormView: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
                     }
+                    .listRowBackground(Theme.card)
                 }
 
                 if viewModel.isEditing {
                     Section {
                         Toggle("Gearchiveerd", isOn: $viewModel.draft.isArchived)
                     }
+                    .listRowBackground(Theme.card)
                 }
 
                 if !viewModel.validationErrors.isEmpty {
@@ -64,6 +68,7 @@ struct AccountFormView: View {
                                 .foregroundStyle(Theme.warning)
                         }
                     }
+                    .listRowBackground(Theme.card)
                 }
             }
             .scrollContentBackground(.hidden)

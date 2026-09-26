@@ -54,6 +54,7 @@ struct TradeFormView: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
                     }
+                    .listRowBackground(Theme.card)
                 }
                 if viewModel.entryStyle == .quick {
                     quickSections
@@ -200,6 +201,7 @@ struct TradeFormView: View {
                 .foregroundStyle(Theme.textTertiary)
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     /// Klein icoon achter een veld dat de screenshot-import heeft ingevuld.
@@ -294,6 +296,7 @@ struct TradeFormView: View {
             }
             symbolField
         }
+        .listRowBackground(Theme.card)
 
         Section("Resultaat") {
             Picker("Resultaat", selection: $viewModel.quickIsProfit) {
@@ -305,6 +308,7 @@ struct TradeFormView: View {
             directionPicker
             entryDatePicker("Datum")
         }
+        .listRowBackground(Theme.card)
 
         confluencesSection
 
@@ -312,6 +316,7 @@ struct TradeFormView: View {
             TextField("Optioneel", text: $viewModel.values.notes, axis: .vertical)
                 .lineLimit(2...6)
         }
+        .listRowBackground(Theme.card)
     }
 
     // MARK: - Secties
@@ -326,6 +331,7 @@ struct TradeFormView: View {
         } header: {
             Text("Nog nodig om op te slaan")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var accountSection: some View {
@@ -338,6 +344,7 @@ struct TradeFormView: View {
             }
             Toggle("Backtest-trade", isOn: $viewModel.values.isBacktest)
         }
+        .listRowBackground(Theme.card)
     }
 
     private var instrumentSection: some View {
@@ -352,6 +359,7 @@ struct TradeFormView: View {
             numberRow("Tick size", value: $viewModel.values.tickSize)
             numberRow("Tick value ($)", value: $viewModel.values.tickValue)
         }
+        .listRowBackground(Theme.card)
     }
 
     private var symbolField: some View {
@@ -425,6 +433,7 @@ struct TradeFormView: View {
                 }
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     private var closedBinding: Binding<Bool> {
@@ -464,6 +473,7 @@ struct TradeFormView: View {
             numberRow("MAE", value: optionalDoubleBinding(\.mae))
             numberRow("MFE", value: optionalDoubleBinding(\.mfe))
         }
+        .listRowBackground(Theme.card)
     }
 
     private var exitPriceBinding: Binding<Double> {
@@ -487,6 +497,7 @@ struct TradeFormView: View {
             numberRow("Commissie", value: $viewModel.values.commission, ocrField: .commission)
             numberRow("Fees", value: $viewModel.values.fees, ocrField: .fees)
         }
+        .listRowBackground(Theme.card)
     }
 
     /// Resultaat zoals de broker het toont; gaat vóór de berekening uit prijzen.
@@ -498,6 +509,7 @@ struct TradeFormView: View {
         } footer: {
             Text("Leeg: P&L uit prijzen, aantal en tick value. Ingevuld (bijv. van de screenshot, in de valuta van je account) gaat dit bedrag voor.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var brokerNetPnLBinding: Binding<Double> {
@@ -542,6 +554,7 @@ struct TradeFormView: View {
                 }
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     private var playbookBinding: Binding<Playbook?> {
@@ -585,6 +598,7 @@ struct TradeFormView: View {
                 }
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     private var tagsAndMistakesSection: some View {
@@ -619,6 +633,7 @@ struct TradeFormView: View {
             .padding(.vertical, 4)
             .listRowBackground(Theme.card)
         }
+        .listRowBackground(Theme.card)
     }
 
     private var reflectionSection: some View {
@@ -634,6 +649,7 @@ struct TradeFormView: View {
             TextField("Notities", text: $viewModel.values.notes, axis: .vertical)
                 .lineLimit(3...8)
         }
+        .listRowBackground(Theme.card)
     }
 
     private var screenshotsSection: some View {
@@ -668,6 +684,7 @@ struct TradeFormView: View {
                 .listRowBackground(Theme.card)
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     private func screenshotThumbnail(data: Data, onRemove: @escaping () -> Void) -> some View {
