@@ -66,10 +66,13 @@ public struct GoalsService: Sendable {
     public static let defaultWarningFraction = 0.8
 
     public let statsService: StatsService
+    /// Dezelfde dag-/maandaggregatie als de kalender (zie `netPnL`).
+    public let aggregationService: CalendarAggregationService
     public let warningFraction: Double
 
     public init(statsService: StatsService = StatsService(), warningFraction: Double = GoalsService.defaultWarningFraction) {
         self.statsService = statsService
+        self.aggregationService = CalendarAggregationService(statsService: statsService)
         self.warningFraction = warningFraction
     }
 
@@ -89,8 +92,14 @@ public struct GoalsService: Sendable {
     /// Doelstatus van `account` op basis van zijn (gesloten) trades.
     /// Geeft `nil` als het account geen enkel doel of limiet heeft.
     ///
-    /// - Maanddoel: netto P&L van trades met exit in de huidige maand.
-    /// - Daily loss: verlies van trades met exit vandaag.
+    /// - Maanddoel: netto P&L (na kosten) van alle gesloten trades in de
+    ///   huidige kalendermaand, in de tijdzone van `calendar`. Verliezen
+    ///   trekken het af.
+    /// - Daily loss: verlies van de gesloten trades van vandaag.
+    ///
+    /// Beide tellen een trade op dezelfde dag als de kalender
+    /// (`CalendarAggregationService.referenceDate`): de exit, of de entry als
+    /// er geen exit-tijd is ingevuld.
     /// - Drawdown: huidige afstand van de hoogste equity (startbalans +
     ///   cumulatieve P&L) tot de huidige equity — trailing, zoals prop firms rekenen.
     public func status(for account: Account, trades allTrades: [Trade], now: Date = Date(), calendar: Calendar = .current) -> AccountGoalStatus? {
@@ -136,12 +145,7 @@ public struct GoalsService: Sendable {
     // MARK: - Helpers
 
     private func netPnL(of trades: [Trade], closedIn component: Calendar.Component, of now: Date, calendar: Calendar) -> Double {
-        guard let interval = calendar.dateInterval(of: component, for: now) else { return 0 }
-        return trades.reduce(0) { sum, trade in
-            guard let exit = trade.exitDate, interval.contains(exit) else { return sum }
-            let metrics = statsService.metrics(for: trade)
-            return metrics.outcome == .open ? sum : sum + metrics.netPnL
-        }
+        aggregationService.netPnL(of: trades, periodOf: component, containing: now, calendar: calendar)
     }
 
     private func positive(_ value: Double?) -> Double? {
