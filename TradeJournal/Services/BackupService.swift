@@ -46,7 +46,8 @@ public struct BackupService {
     public struct LoadedBackup {
         public let payload: BackupPayload
         public let summary: Summary
-        let reader: ZipReader
+        /// Zip-bestand of uitgepakte map (zie `BackupArchiveOpener`).
+        let reader: BackupArchive
     }
 
     /// Waar instellingen vandaan komen (export) en naartoe gaan (restore).
@@ -216,8 +217,12 @@ public struct BackupService {
     // MARK: - Inlezen
 
     /// Leest en valideert een backup zonder iets aan de database te veranderen.
+    ///
+    /// `url` mag het `.zip`-bestand zijn, maar ook de map die de Bestanden-app
+    /// ervan maakt als je op de zip tikt (`backup.json` + `images/`) of alleen
+    /// `backup.json` — zie `BackupArchiveOpener`.
     public func loadBackup(at url: URL) throws -> LoadedBackup {
-        let reader = try ZipReader(url: url)
+        let reader = try BackupArchiveOpener.open(url)
         guard reader.contains(Self.payloadPath) else { throw BackupError.missingPayload }
 
         let payload: BackupPayload
@@ -454,7 +459,7 @@ public struct BackupService {
 
     // MARK: - Helpers
 
-    private func image(named fileName: String, in reader: ZipReader) -> Data? {
+    private func image(named fileName: String, in reader: BackupArchive) -> Data? {
         // Alleen platte bestandsnamen binnen images/ accepteren.
         guard !fileName.isEmpty, !fileName.contains("/"), !fileName.contains("..") else { return nil }
         return try? reader.data(for: Self.imagesFolder + fileName)

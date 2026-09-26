@@ -21,7 +21,9 @@ struct BackupView: View {
 
         var contentTypes: [UTType] {
             switch self {
-            case .restore: return [.zip]
+            // Zip, óf wat de Bestanden-app ervan maakt na uitpakken: de map
+            // (backup.json + images/) of alleen backup.json.
+            case .restore: return [.zip, .folder, .json]
             case .folder: return [.folder]
             }
         }
@@ -154,7 +156,7 @@ struct BackupView: View {
         } header: {
             Text("Herstellen")
         } footer: {
-            Text("Een restore vervangt álle huidige data door de inhoud van de backup. Je ziet eerst een samenvatting ter bevestiging.")
+            Text("Kies het .zip-bestand, of — als Bestanden de zip al heeft uitgepakt — de backupmap of backup.json. Kies bij voorkeur de map, dan komen de screenshots ook mee. Een restore vervangt álle huidige data door de inhoud van de backup; je ziet eerst een samenvatting ter bevestiging.")
         }
         .listRowBackground(Theme.card)
     }
