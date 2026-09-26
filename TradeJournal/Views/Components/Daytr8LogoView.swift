@@ -33,7 +33,9 @@ struct Daytr8EightShape: Shape {
         let bottom = box(0, 58, 100, 82, topLeading: 36, topTrailing: 36, bottomTrailing: 0, bottomLeading: 36)
         let topHole = box(32, 22, 36, 22, topLeading: 11, topTrailing: 11, bottomTrailing: 11, bottomLeading: 11)
         let bottomHole = box(28, 82, 44, 36, topLeading: 18, topTrailing: 18, bottomTrailing: 18, bottomLeading: 18)
-        return Path(top.union(bottom).subtracting(topHole.union(bottomHole)))
+        // `normalized()` zet de contouren zo dat de gaten ook met de standaard
+        // (non-zero) vulregel leeg blijven; de view vult bovendien even-odd.
+        return Path(top.union(bottom).subtracting(topHole.union(bottomHole)).normalized())
     }
 }
 
@@ -84,7 +86,7 @@ struct Daytr8LogoView: View {
 
     private func eight(height: CGFloat) -> some View {
         Daytr8EightShape()
-            .fill(eightColor ?? Theme.accent)
+            .fill(eightColor ?? Theme.accent, style: FillStyle(eoFill: true))
             .frame(width: height * Daytr8EightShape.aspectRatio, height: height)
     }
 }

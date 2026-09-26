@@ -36,6 +36,7 @@ final class Daytr8LogoTests: XCTestCase {
 
         XCTAssertFalse(path.contains(CGPoint(x: 50, y: 33)), "gat boven")
         XCTAssertFalse(path.contains(CGPoint(x: 50, y: 100)), "gat onder")
+        XCTAssertFalse(path.contains(CGPoint(x: 50, y: 33), eoFill: true), "gat boven (even-odd, zoals de view vult)")
         XCTAssertTrue(path.contains(CGPoint(x: 50, y: 10)), "bovenbalk")
         XCTAssertTrue(path.contains(CGPoint(x: 50, y: 62)), "taille")
         XCTAssertTrue(path.contains(CGPoint(x: 50, y: 130)), "onderbalk")
