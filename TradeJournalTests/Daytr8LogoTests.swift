@@ -29,26 +29,26 @@ final class Daytr8LogoTests: XCTestCase {
 
     func test_eightShape_hasHolesAndFilledLoops() {
         let rect = CGRect(x: 0, y: 0, width: 100, height: 140)
-        let path = Daytr8EightShape().path(in: rect)
-        XCTAssertFalse(path.isEmpty)
-        XCTAssertEqual(path.boundingRect.width, 100, accuracy: 0.5)
-        XCTAssertEqual(path.boundingRect.height, 140, accuracy: 0.5)
+        let outline = Daytr8EightShape(part: .outline).path(in: rect)
+        XCTAssertEqual(outline.boundingRect.width, 100, accuracy: 0.5)
+        XCTAssertEqual(outline.boundingRect.height, 140, accuracy: 0.5)
+        func ink(_ x: CGFloat, _ y: CGFloat) -> Bool { Daytr8EightShape.isInk(at: CGPoint(x: x, y: y), in: rect) }
 
-        XCTAssertFalse(path.contains(CGPoint(x: 50, y: 33)), "gat boven")
-        XCTAssertFalse(path.contains(CGPoint(x: 50, y: 100)), "gat onder")
-        XCTAssertFalse(path.contains(CGPoint(x: 50, y: 33), eoFill: true), "gat boven (even-odd, zoals de view vult)")
-        XCTAssertTrue(path.contains(CGPoint(x: 50, y: 10)), "bovenbalk")
-        XCTAssertTrue(path.contains(CGPoint(x: 50, y: 62)), "taille")
-        XCTAssertTrue(path.contains(CGPoint(x: 50, y: 130)), "onderbalk")
+        XCTAssertFalse(ink(50, 33), "gat boven")
+        XCTAssertFalse(ink(50, 100), "gat onder")
+        XCTAssertTrue(ink(50, 10), "bovenbalk")
+        XCTAssertTrue(ink(50, 62), "taille")
+        XCTAssertTrue(ink(50, 130), "onderbalk")
+        XCTAssertTrue(ink(15, 100), "linkerzijde onder")
         // Kenmerk: scherpe hoeken linksboven en rechtsonder.
-        XCTAssertTrue(path.contains(CGPoint(x: 9, y: 1)))
-        XCTAssertTrue(path.contains(CGPoint(x: 99, y: 139)))
-        XCTAssertFalse(path.contains(CGPoint(x: 1, y: 139)), "linksonder is afgerond")
+        XCTAssertTrue(ink(9, 1))
+        XCTAssertTrue(ink(99, 139))
+        XCTAssertFalse(ink(1, 139), "linksonder is afgerond")
     }
 
     func test_eightShape_scalesToSmallSizes() {
-        let path = Daytr8EightShape().path(in: CGRect(x: 0, y: 0, width: 24 * Daytr8EightShape.aspectRatio, height: 24))
-        XCTAssertFalse(path.isEmpty)
-        XCTAssertFalse(path.contains(CGPoint(x: 8.5, y: 5.6)), "gat boven blijft open op 24 pt")
+        let rect = CGRect(x: 0, y: 0, width: 24 * Daytr8EightShape.aspectRatio, height: 24)
+        XCTAssertFalse(Daytr8EightShape.isInk(at: CGPoint(x: 8.5, y: 5.6), in: rect), "gat boven blijft open op 24 pt")
+        XCTAssertTrue(Daytr8EightShape.isInk(at: CGPoint(x: 8.5, y: 1.5), in: rect), "bovenbalk zichtbaar op 24 pt")
     }
 }

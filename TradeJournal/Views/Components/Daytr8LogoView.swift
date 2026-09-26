@@ -9,15 +9,26 @@ import SwiftUI
 /// `Branding/generate_icons.py` en de SVG's in `Branding/`.
 struct Daytr8EightShape: Shape {
 
+    /// Welk deel van de "8": de buitenvorm (twee overlappende lussen) of de
+    /// twee gaten. De view vult de buitenvorm en snijdt de gaten eruit met
+    /// `.blendMode(.destinationOut)`, zodat ze op elke achtergrond echt leeg zijn.
+    enum Part {
+        case outline
+        case holes
+    }
+
     /// Breedte/hoogte-verhouding van de vorm.
     static let aspectRatio: CGFloat = 100.0 / 140.0
+
+    var part: Part = .outline
 
     func path(in rect: CGRect) -> Path {
         let sx = rect.width / 100
         let sy = rect.height / 140
         let s = min(sx, sy)
+        var path = Path()
         func box(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat,
-                 topLeading: CGFloat, topTrailing: CGFloat, bottomTrailing: CGFloat, bottomLeading: CGFloat) -> CGPath {
+                 topLeading: CGFloat, topTrailing: CGFloat, bottomTrailing: CGFloat, bottomLeading: CGFloat) {
             let frame = CGRect(x: rect.minX + x * sx, y: rect.minY + y * sy, width: w * sx, height: h * sy)
             let shape = UnevenRoundedRectangle(
                 topLeadingRadius: topLeading * s,
@@ -26,16 +37,25 @@ struct Daytr8EightShape: Shape {
                 topTrailingRadius: topTrailing * s,
                 style: .circular
             )
-            return shape.path(in: frame).cgPath
+            path.addPath(shape.path(in: frame))
         }
 
-        let top = box(8, 0, 84, 66, topLeading: 0, topTrailing: 30, bottomTrailing: 30, bottomLeading: 30)
-        let bottom = box(0, 58, 100, 82, topLeading: 36, topTrailing: 36, bottomTrailing: 0, bottomLeading: 36)
-        let topHole = box(32, 22, 36, 22, topLeading: 11, topTrailing: 11, bottomTrailing: 11, bottomLeading: 11)
-        let bottomHole = box(28, 82, 44, 36, topLeading: 18, topTrailing: 18, bottomTrailing: 18, bottomLeading: 18)
-        // `normalized()` zet de contouren zo dat de gaten ook met de standaard
-        // (non-zero) vulregel leeg blijven; de view vult bovendien even-odd.
-        return Path(top.union(bottom).subtracting(topHole.union(bottomHole)).normalized())
+        switch part {
+        case .outline:
+            // Zelfde draairichting → non-zero vullen geeft de vereniging.
+            box(8, 0, 84, 66, topLeading: 0, topTrailing: 30, bottomTrailing: 30, bottomLeading: 30)
+            box(0, 58, 100, 82, topLeading: 36, topTrailing: 36, bottomTrailing: 0, bottomLeading: 36)
+        case .holes:
+            box(32, 22, 36, 22, topLeading: 11, topTrailing: 11, bottomTrailing: 11, bottomLeading: 11)
+            box(28, 82, 44, 36, topLeading: 18, topTrailing: 18, bottomTrailing: 18, bottomLeading: 18)
+        }
+        return path
+    }
+
+    /// `true` als `point` zichtbaar gekleurd is (in de buitenvorm, niet in een gat).
+    static func isInk(at point: CGPoint, in rect: CGRect) -> Bool {
+        Daytr8EightShape(part: .outline).path(in: rect).contains(point)
+            && !Daytr8EightShape(part: .holes).path(in: rect).contains(point)
     }
 }
 
@@ -85,9 +105,15 @@ struct Daytr8LogoView: View {
     }
 
     private func eight(height: CGFloat) -> some View {
-        Daytr8EightShape()
-            .fill(eightColor ?? Theme.accent, style: FillStyle(eoFill: true))
-            .frame(width: height * Daytr8EightShape.aspectRatio, height: height)
+        ZStack {
+            Daytr8EightShape(part: .outline)
+                .fill(eightColor ?? Theme.accent)
+            Daytr8EightShape(part: .holes)
+                .fill(Color.black)
+                .blendMode(.destinationOut)
+        }
+        .compositingGroup()
+        .frame(width: height * Daytr8EightShape.aspectRatio, height: height)
     }
 }
 
