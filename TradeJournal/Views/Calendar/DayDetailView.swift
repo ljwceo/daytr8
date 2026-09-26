@@ -150,7 +150,7 @@ struct DayDetailView: View {
                 }
                 .padding(.vertical, 10)
                 .background(Theme.accent)
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Theme.onAccent)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))
             }
         }
