@@ -1103,12 +1103,20 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
   tertiair/neutraal/waarschuwing ≥ 3:1; tekst op accent ≥ 4,5:1), winst en
   verlies blijven groen resp. rood.
 
+### Vervolg: openstaande punten opgelost
+- Rijen in `List`/`Form` volgen nu de kaartkleur van het thema: elke `Section`
+  in de schermen onder Meer en in `TradeFormView` kreeg
+  `.listRowBackground(Theme.card)`, losse rijen in Accounts en Notebook ook.
+  Voorheen wit (lichte thema's) of systeemgrijs (donkere).
+- `AppLockOverlayView` zet zelf `.tint(Theme.accent)` en de ontgrendelknop
+  gebruikt `Theme.onAccent` (was `textPrimary` op accent: slecht leesbaar
+  in lichte thema's). Het vergrendelscherm volgt het thema dus live.
+- Zelfde contrastfix voor actieve accent-chips: rapporttabs (`ReportsView`)
+  en de filters/Backtest-chip op het dashboard (`DashboardFilterBar`).
+
 ### Openstaand
-- System-rijen in `List`/`Form` zonder eigen `listRowBackground` volgen het
-  color scheme (wit in lichte thema's, grijs in donkere), niet de exacte
-  kaartkleur van het palet.
-- Het app-slotscherm krijgt de tint van een nieuw thema pas na een herstart.
 - Nog niet op het toestel getest.
+- Nieuwe `List`/`Form`-secties: geef ze `.listRowBackground(Theme.card)` mee.
 
 ## Volgende fase
 

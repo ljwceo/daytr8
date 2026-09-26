@@ -85,6 +85,7 @@ struct CSVImportView: View {
             } footer: {
                 Text("Exporteer je trades of fills uit je platform als CSV en kies het bestand hier. Losse fills worden automatisch samengevoegd tot trades; trades die al in je journal staan worden als duplicaat herkend.")
             }
+            .listRowBackground(Theme.card)
 
             Section("Ondersteunde presets") {
                 ForEach(CSVImportPresets.all) { preset in
@@ -98,6 +99,7 @@ struct CSVImportView: View {
                     }
                 }
             }
+            .listRowBackground(Theme.card)
         }
     }
 
@@ -116,6 +118,7 @@ struct CSVImportView: View {
                 }
                 Button("Ander bestand kiezen…") { isImporterPresented = true }
             }
+            .listRowBackground(Theme.card)
 
             Section {
                 Picker("Preset", selection: Binding(
@@ -154,6 +157,7 @@ struct CSVImportView: View {
             } footer: {
                 Text("De tijdzone wordt alleen gebruikt voor tijden zonder expliciete offset.")
             }
+            .listRowBackground(Theme.card)
 
             Section("Account") {
                 Picker("Importeer naar", selection: $viewModel.account) {
@@ -163,6 +167,7 @@ struct CSVImportView: View {
                     }
                 }
             }
+            .listRowBackground(Theme.card)
 
             Section {
                 ForEach(CSVImportField.fields(for: viewModel.mapping.mode)) { field in
@@ -175,6 +180,7 @@ struct CSVImportView: View {
                      ? "Elke rij is een fill. Zonder koop/verkoop-kolom bepaalt het teken van het aantal de kant."
                      : "Koppel entry/exit, of — voor exports met koop- en verkooptijd (zoals Tradovate) — de koop/verkoop-kolommen.")
             }
+            .listRowBackground(Theme.card)
 
             Section {
                 ForEach(viewModel.validationErrors, id: \.self) { error in
@@ -191,6 +197,7 @@ struct CSVImportView: View {
                 }
                 .disabled(!viewModel.canBuildPreview)
             }
+            .listRowBackground(Theme.card)
         }
     }
 
@@ -234,6 +241,7 @@ private struct CSVImportPreviewView: View {
                         .foregroundStyle(Theme.profit)
                     Button("Klaar", action: onFinished)
                 }
+                .listRowBackground(Theme.card)
             } else {
                 summarySection
             }
@@ -245,6 +253,7 @@ private struct CSVImportPreviewView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.warning)
                 }
+                .listRowBackground(Theme.card)
             }
 
             Section("Trades (\(viewModel.previewItems.count))") {
@@ -256,6 +265,7 @@ private struct CSVImportPreviewView: View {
                     CSVImportPreviewRow(item: item)
                 }
             }
+            .listRowBackground(Theme.card)
 
             if let issues = viewModel.extraction?.issues, !issues.isEmpty {
                 Section("Overgeslagen rijen (\(issues.count))") {
@@ -270,6 +280,7 @@ private struct CSVImportPreviewView: View {
                         .font(.footnote)
                     }
                 }
+                .listRowBackground(Theme.card)
             }
         }
         .scrollContentBackground(.hidden)
@@ -296,6 +307,7 @@ private struct CSVImportPreviewView: View {
             }
             .disabled(viewModel.tradesToImportCount == 0)
         }
+        .listRowBackground(Theme.card)
     }
 
     private func summaryTile(title: String, value: Int, color: Color) -> some View {

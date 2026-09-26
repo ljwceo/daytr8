@@ -29,12 +29,14 @@ struct AppLockOverlayView: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
                         .background(Theme.accent)
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.onAccent)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))
                 }
                 .disabled(viewModel.isAuthenticating)
             }
             .padding(Theme.cardPadding)
         }
+        // Ligt buiten `RootTabView`; tint hier zetten zodat hij het thema live volgt.
+        .tint(Theme.accent)
     }
 }

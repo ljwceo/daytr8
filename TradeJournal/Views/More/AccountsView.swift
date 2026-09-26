@@ -22,6 +22,7 @@ struct AccountsView: View {
                     Text("Nog geen accounts. Voeg er een toe om doelen en limieten in te stellen.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.textSecondary)
+                        .listRowBackground(Theme.card)
                 }
                 ForEach(accounts) { account in
                     Button {
@@ -36,6 +37,7 @@ struct AccountsView: View {
                             Label("Verwijderen", systemImage: "trash")
                         }
                     }
+                    .listRowBackground(Theme.card)
                 }
 
                 Section {
@@ -43,6 +45,7 @@ struct AccountsView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
         }

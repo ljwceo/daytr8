@@ -39,6 +39,7 @@ struct DailyRulesView: View {
                 } footer: {
                     Text("Automatische regels worden beoordeeld op je trades en journal van die dag; handmatige regels vink je zelf af. Een nieuwe regel telt pas mee vanaf de dag dat je hem aanmaakt.")
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
         }
@@ -129,6 +130,7 @@ private struct DailyRuleEditorView: View {
                     }
                     Toggle("Actief", isOn: $draft.isActive)
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)

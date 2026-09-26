@@ -115,7 +115,7 @@ struct DashboardFilterBar: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .foregroundStyle(Theme.textPrimary)
+            .foregroundStyle(viewModel.includeBacktest ? Theme.onAccent : Theme.textPrimary)
             .background(viewModel.includeBacktest ? Theme.accent.opacity(0.85) : Theme.elevated)
             .clipShape(Capsule())
         }
@@ -130,7 +130,7 @@ struct DashboardFilterBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .foregroundStyle(Theme.textPrimary)
+        .foregroundStyle(isActive ? Theme.onAccent : Theme.textPrimary)
         .background(isActive ? Theme.accent.opacity(0.85) : Theme.elevated)
         .clipShape(Capsule())
     }

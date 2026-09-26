@@ -24,6 +24,7 @@ struct NotebookView: View {
                          : "Geen notities gevonden.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.textSecondary)
+                        .listRowBackground(Theme.card)
                 }
                 ForEach(visible) { note in
                     Button {
@@ -46,6 +47,7 @@ struct NotebookView: View {
                             Label("Verwijderen", systemImage: "trash")
                         }
                     }
+                    .listRowBackground(Theme.card)
                 }
             }
             .scrollContentBackground(.hidden)

@@ -16,12 +16,14 @@ struct ReminderSettingsView: View {
             } footer: {
                 Text("Een lokale melding op dit toestel — er gaat niets via internet.")
             }
+            .listRowBackground(Theme.card)
 
             if viewModel.isEnabled {
                 Section("Tekst") {
                     TextField("Melding", text: $viewModel.message, axis: .vertical)
                         .lineLimit(1...4)
                 }
+                .listRowBackground(Theme.card)
             }
 
             if viewModel.permissionDenied {
@@ -30,6 +32,7 @@ struct ReminderSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.warning)
                 }
+                .listRowBackground(Theme.card)
             }
         }
         .scrollContentBackground(.hidden)

@@ -47,6 +47,7 @@ struct MoreView: View {
                         row("Confluences", value: "\(confluences.count)")
                         row("Instrumenten", value: "\(instruments.count)")
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Journal") {
                         NavigationLink {
@@ -65,6 +66,7 @@ struct MoreView: View {
                             Label("Journal-templates", systemImage: "doc.text")
                         }
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Accounts") {
                         NavigationLink {
@@ -73,6 +75,7 @@ struct MoreView: View {
                             Label("Accounts & doelen", systemImage: "person.crop.circle")
                         }
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Trading") {
                         NavigationLink {
@@ -81,6 +84,7 @@ struct MoreView: View {
                             Label("Confluences", systemImage: "checklist")
                         }
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Instellingen") {
                         NavigationLink {
@@ -109,6 +113,7 @@ struct MoreView: View {
                             Label("Screenshot-templates", systemImage: "text.viewfinder")
                         }
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Data") {
                         NavigationLink {
@@ -130,6 +135,7 @@ struct MoreView: View {
                             Label("CSV importeren", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
+                    .listRowBackground(Theme.card)
 
                     Section("Debug (fase 1)") {
                         Button {
@@ -157,6 +163,7 @@ struct MoreView: View {
                         }
                         .disabled(isBusy)
                     }
+                    .listRowBackground(Theme.card)
                 }
                 .scrollContentBackground(.hidden)
                 .background(Theme.background)

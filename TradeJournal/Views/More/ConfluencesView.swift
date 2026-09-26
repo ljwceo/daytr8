@@ -53,6 +53,7 @@ struct ConfluencesView: View {
                                 viewModel.move(items, from: source, to: destination)
                             }
                         }
+                        .listRowBackground(Theme.card)
                     }
                 }
 
@@ -68,6 +69,7 @@ struct ConfluencesView: View {
                 } footer: {
                     Text("Tik op een confluence om hem te bewerken; veeg naar links om te archiveren of te verwijderen. Gearchiveerde confluences verschijnen niet meer in nieuwe trades, maar blijven op bestaande trades en in de rapporten staan.")
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
         }
@@ -194,6 +196,7 @@ private struct ConfluenceEditorView: View {
                         Text(nameError).foregroundStyle(Theme.warning)
                     }
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Voorbeeld") {
                     ChipView(title: draft.trimmedName.isEmpty ? "Confluence" : draft.trimmedName,
@@ -202,6 +205,7 @@ private struct ConfluenceEditorView: View {
                              isSelected: true)
                         .listRowBackground(Theme.card)
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Kleur") {
                     FlowLayout(spacing: 10) {
@@ -221,6 +225,7 @@ private struct ConfluenceEditorView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Icoon") {
                     FlowLayout(spacing: 8) {
@@ -239,11 +244,13 @@ private struct ConfluenceEditorView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Omschrijving") {
                     TextField("Optioneel", text: $draft.descriptionText, axis: .vertical)
                         .lineLimit(2...5)
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)

@@ -43,6 +43,7 @@ struct NoteEditorView: View {
                         .lineLimit(6...30)
                     Toggle("Vastpinnen", isOn: $draft.isPinned)
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Gekoppelde dag") {
                     Toggle("Koppel aan een dag", isOn: hasLinkedDate)
@@ -50,6 +51,7 @@ struct NoteEditorView: View {
                         DatePicker("Dag", selection: linkedDateBinding, displayedComponents: .date)
                     }
                 }
+                .listRowBackground(Theme.card)
 
                 Section("Gekoppelde trades") {
                     ForEach(linkedTrades) { trade in
@@ -71,6 +73,7 @@ struct NoteEditorView: View {
                         Label("Trade koppelen", systemImage: "link")
                     }
                 }
+                .listRowBackground(Theme.card)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)

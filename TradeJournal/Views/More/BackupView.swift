@@ -41,12 +41,14 @@ struct BackupView: View {
                         .foregroundStyle(Theme.loss)
                         .font(.footnote)
                 }
+                .listRowBackground(Theme.card)
             } else if let message = viewModel.statusMessage {
                 Section {
                     Label(message, systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Theme.profit)
                         .font(.footnote)
                 }
+                .listRowBackground(Theme.card)
             }
         }
         .scrollContentBackground(.hidden)
@@ -123,6 +125,7 @@ struct BackupView: View {
         } footer: {
             Text("De herinnering verschijnt op het dashboard als de laatste backup ouder is dan 7 dagen.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var backupSection: some View {
@@ -137,6 +140,7 @@ struct BackupView: View {
         } footer: {
             Text("Bevat alle trades, accounts, playbooks, confluences, journals en screenshots. Kies \"Bewaar in Bestanden\" of deel het bestand, bijvoorbeeld naar je computer.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var restoreSection: some View {
@@ -152,6 +156,7 @@ struct BackupView: View {
         } footer: {
             Text("Een restore vervangt álle huidige data door de inhoud van de backup. Je ziet eerst een samenvatting ter bevestiging.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var autoBackupSection: some View {
@@ -217,6 +222,7 @@ struct BackupView: View {
                  ? "De app schrijft bij het openen (of dagelijks) een backup naar de gekozen map en bewaart daar de laatste \(BackupSettings.defaultKeepCount) automatische backups."
                  : "Staat uit tot je een map kiest (bijv. iCloud Drive of Op mijn iPhone). Na het kiezen wordt er direct een eerste backup gemaakt.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var exportSection: some View {
@@ -231,6 +237,7 @@ struct BackupView: View {
         } footer: {
             Text("Eén rij per trade, inclusief P&L, R-multiple, confluences en notities. Dit bestand kan later ook weer geïmporteerd worden.")
         }
+        .listRowBackground(Theme.card)
     }
 
     private var restoreMessage: String {

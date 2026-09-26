@@ -19,6 +19,7 @@ struct AppLockSettingsView: View {
             } footer: {
                 Text("Bij het openen van de app vraagt TradeJournal om \(viewModel.methodName). Lukt dat niet, dan kun je je toegangscode gebruiken.")
             }
+            .listRowBackground(Theme.card)
 
             if let error = viewModel.errorMessage {
                 Section {
@@ -26,6 +27,7 @@ struct AppLockSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.warning)
                 }
+                .listRowBackground(Theme.card)
             }
         }
         .scrollContentBackground(.hidden)

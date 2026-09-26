@@ -20,6 +20,7 @@ struct ScreenshotTemplatesView: View {
             } footer: {
                 Text("Het platform wordt herkend aan de sleutelwoorden op de screenshot. Wordt niets herkend, dan vult het generieke template aan wat het kan vinden.")
             }
+            .listRowBackground(Theme.card)
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
@@ -75,6 +76,7 @@ private struct ScreenshotTemplateDetailView: View {
                     .padding(.vertical, 4)
                 }
             }
+            .listRowBackground(Theme.card)
 
             Section("Velden") {
                 ForEach(template.definedFields) { field in
@@ -91,6 +93,7 @@ private struct ScreenshotTemplateDetailView: View {
                     .padding(.vertical, 2)
                 }
             }
+            .listRowBackground(Theme.card)
 
             if let columns = template.columns, !columns.isEmpty {
                 Section {
@@ -110,6 +113,7 @@ private struct ScreenshotTemplateDetailView: View {
                 } footer: {
                     Text("Kolomkoppen voor tabelweergaven: waarden worden gekoppeld aan de kop erboven, elke rij is één trade.")
                 }
+                .listRowBackground(Theme.card)
             }
 
             Section {
@@ -121,6 +125,7 @@ private struct ScreenshotTemplateDetailView: View {
             } footer: {
                 Text("Templates zijn JSON-bestanden in Resources/ScreenshotTemplates. Een nieuw platform toevoegen kan zonder code aan te passen.")
             }
+            .listRowBackground(Theme.card)
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
