@@ -7,6 +7,7 @@ import SwiftData
 struct TradesView: View {
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(OnboardingViewModel.self) private var onboarding
 
     @Query(sort: \Trade.entryDate, order: .reverse) private var trades: [Trade]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
@@ -92,6 +93,9 @@ struct TradesView: View {
             }
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            // "Eerste trade toevoegen" aan het einde van de rondleiding.
+            .onAppear { openRequestedNewTrade() }
+            .onChange(of: onboarding.isNewTradeRequested) { _, _ in openRequestedNewTrade() }
             .sheet(isPresented: $showingNewTrade) {
                 TradeFormView(mode: .create, lastTrade: trades.first, fallbackAccount: accounts.first)
             }
@@ -111,6 +115,12 @@ struct TradesView: View {
         }
     }
 
+    private func openRequestedNewTrade() {
+        if onboarding.consumeNewTradeRequest() {
+            showingNewTrade = true
+        }
+    }
+
     private var quickFilterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -118,6 +128,7 @@ struct TradesView: View {
                     ChipView(
                         title: filter.displayName,
                         color: Theme.accent,
+                        selectedForeground: Theme.onAccent,
                         isSelected: viewModel.quickFilter == filter
                     ) {
                         viewModel.quickFilter = filter
@@ -133,6 +144,7 @@ struct TradesView: View {
 
 #Preview {
     TradesView()
+        .environment(OnboardingViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }

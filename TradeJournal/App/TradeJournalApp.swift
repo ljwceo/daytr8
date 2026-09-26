@@ -9,6 +9,9 @@ struct TradeJournalApp: App {
     /// App-slot (Face ID / code), gedeeld met het instellingenscherm via de environment.
     @State private var appLock = AppLockViewModel()
 
+    /// Welkomstmelding, rondleiding en tabselectie.
+    @State private var onboarding = OnboardingViewModel()
+
     /// Eén centrale `ModelContainer` voor de hele app — bevat het volledige
     /// schema uit `AppSchema.models`.
     let container: ModelContainer = {
@@ -28,7 +31,8 @@ struct TradeJournalApp: App {
                     }
                 }
                 .environment(appLock)
-                .preferredColorScheme(.dark)
+                .environment(onboarding)
+                // Color scheme volgt het gekozen thema en staat op `RootTabView`.
                 .tint(Theme.accent)
                 .task {
                     // Idempotente seed van standaardconfluences en instrumentpresets
@@ -36,6 +40,8 @@ struct TradeJournalApp: App {
                     SeedService.seedDefaultsIfNeeded(in: container.mainContext)
                     // Automatische backup naar de gekozen map (als ingesteld).
                     AutoBackupService().runIfDue(context: container.mainContext, isLaunch: true)
+                    // Eerste start: welkomstmelding (verschijnt na ontgrendelen).
+                    onboarding.handleLaunch()
                     // Koude start: direct om ontgrendeling vragen als het slot aan staat.
                     await appLock.unlock()
                 }

@@ -20,6 +20,7 @@ struct TradeFormView: View {
     @State private var showingOCRPhotoPicker = false
     @State private var ocrPhotoItem: PhotosPickerItem?
     @State private var showingCamera = false
+    @State private var showingScreenshotExample = false
 
     @Query(sort: \Instrument.sortOrder) private var instruments: [Instrument]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
@@ -109,6 +110,9 @@ struct TradeFormView: View {
                     ocrPhotoItem = nil
                 }
             }
+            .sheet(isPresented: $showingScreenshotExample) {
+                ScreenshotExampleSheetView()
+            }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraPickerView { data in
                     showingCamera = false
@@ -125,13 +129,29 @@ struct TradeFormView: View {
     /// "Vul in vanuit screenshot" plus de status van de laatste import.
     private var screenshotImportSection: some View {
         Section {
-            Button {
-                showingScreenshotSource = true
-            } label: {
-                Label("Vul in vanuit screenshot", systemImage: "text.viewfinder")
-                    .foregroundStyle(Theme.accent)
+            HStack {
+                Button {
+                    showingScreenshotSource = true
+                } label: {
+                    Label("Vul in vanuit screenshot", systemImage: "text.viewfinder")
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.borderless)
+                .disabled(viewModel.isRecognizingScreenshot)
+
+                Spacer()
+
+                // Voorbeeld van een geschikte screenshot (zelfde als in de onboarding).
+                Button {
+                    showingScreenshotExample = true
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.title3)
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(AppStrings.ScreenshotExample.helpAccessibility)
             }
-            .disabled(viewModel.isRecognizingScreenshot)
 
             if viewModel.isRecognizingScreenshot {
                 HStack(spacing: 8) {
@@ -156,7 +176,7 @@ struct TradeFormView: View {
                         .foregroundStyle(Theme.textSecondary)
                     FlowLayout(spacing: 8) {
                         ForEach(viewModel.ocrTradeCandidates) { candidate in
-                            ChipView(title: candidate.label, color: Theme.accent, isSelected: candidate.isSelected) {
+                            ChipView(title: candidate.label, color: Theme.accent, selectedForeground: Theme.onAccent, isSelected: candidate.isSelected) {
                                 viewModel.selectOCRTrade(candidate.id)
                             }
                         }
@@ -200,7 +220,7 @@ struct TradeFormView: View {
         if !candidates.isEmpty {
             FlowLayout(spacing: 8) {
                 ForEach(candidates) { candidate in
-                    ChipView(title: candidate.label, color: Theme.accent, isSelected: candidate.isSelected) {
+                    ChipView(title: candidate.label, color: Theme.accent, selectedForeground: Theme.onAccent, isSelected: candidate.isSelected) {
                         viewModel.selectOCRCandidate(candidate.id, for: field)
                     }
                 }
