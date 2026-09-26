@@ -102,7 +102,7 @@ public enum CSVImportField: String, Codable, CaseIterable, Identifiable, Sendabl
 
 /// Koppeling van CSV-kolommen (op index) aan `CSVImportField`s, plus de
 /// interpretatie-opties die nodig zijn om de waardes te lezen.
-public struct CSVColumnMapping: Equatable, Sendable {
+public struct CSVColumnMapping: Codable, Equatable, Sendable {
     public var mode: CSVImportMode
     /// Veld → kolomindex in `CSVTable.headers`.
     public var columns: [CSVImportField: Int]

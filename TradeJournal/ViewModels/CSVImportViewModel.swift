@@ -30,9 +30,12 @@ public final class CSVImportViewModel {
     public private(set) var importedCount: Int?
 
     private let service: CSVImportService
+    /// Onthoudt eigen kolomkoppelingen per kopregel; `nil` = niet bewaren.
+    @ObservationIgnored private let mappingStore: CSVMappingStore?
 
-    public init(service: CSVImportService = CSVImportService()) {
+    public init(service: CSVImportService = CSVImportService(), mappingStore: CSVMappingStore? = nil) {
         self.service = service
+        self.mappingStore = mappingStore
     }
 
     // MARK: - Stap 1: bestand
@@ -57,7 +60,11 @@ public final class CSVImportViewModel {
             table = parsed
             self.fileName = fileName
             errorMessage = nil
-            if let detected = CSVImportPresets.detectOrGeneric(headers: parsed.headers) {
+            if let saved = mappingStore?.mapping(for: parsed.headers) {
+                // Eerder handmatig gekoppeld bestand met dezelfde kolommen.
+                selectedPresetID = nil
+                mapping = saved
+            } else if let detected = CSVImportPresets.detectOrGeneric(headers: parsed.headers) {
                 applyPreset(id: detected.id)
             } else {
                 selectedPresetID = nil
@@ -130,6 +137,9 @@ public final class CSVImportViewModel {
         let known = CSVImportService.knownSymbols(instruments: instruments)
         let result = service.extract(from: table, mapping: mapping, knownSymbols: known)
         extraction = result
+        if selectedPresetID == nil {
+            mappingStore?.save(mapping, for: table.headers)
+        }
         previewItems = service.preview(result.trades, existingTrades: existingTrades, knownSymbols: known)
         importedCount = nil
     }

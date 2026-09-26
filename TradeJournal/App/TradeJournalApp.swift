@@ -4,6 +4,23 @@ import SwiftData
 @main
 struct TradeJournalApp: App {
 
+    /// Staat bewust bovenaan: eigenschappen worden in declaratievolgorde
+    /// geïnitialiseerd, en de instellingen-migratie moet vóór de andere
+    /// (UserDefaults-lezende) eigenschappen draaien.
+    ///
+    /// Eén centrale `ModelContainer` voor de hele app — bevat het volledige
+    /// schema uit `AppSchema.models`, met migratieplan (zie `PersistenceController`).
+    let container: ModelContainer = {
+        // Instellingen (UserDefaults) naar de huidige versie brengen vóórdat
+        // iets ze leest.
+        SettingsMigrator.migrateIfNeeded()
+        do {
+            return try PersistenceController.makeContainer()
+        } catch {
+            fatalError("Kon SwiftData ModelContainer niet initialiseren: \(error)")
+        }
+    }()
+
     @Environment(\.scenePhase) private var scenePhase
 
     /// App-slot (Face ID / code), gedeeld met het instellingenscherm via de environment.
@@ -11,16 +28,6 @@ struct TradeJournalApp: App {
 
     /// Welkomstmelding, rondleiding en tabselectie.
     @State private var onboarding = OnboardingViewModel()
-
-    /// Eén centrale `ModelContainer` voor de hele app — bevat het volledige
-    /// schema uit `AppSchema.models`.
-    let container: ModelContainer = {
-        do {
-            return try ModelContainer(for: Schema(AppSchema.models))
-        } catch {
-            fatalError("Kon SwiftData ModelContainer niet initialiseren: \(error)")
-        }
-    }()
 
     var body: some Scene {
         WindowGroup {

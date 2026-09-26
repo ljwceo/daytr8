@@ -38,6 +38,12 @@ public struct BackupPayload: Codable, Equatable {
     public var dailyRules: [DailyRuleDTO]? = nil
     public var notebookNotes: [NotebookNoteDTO]? = nil
 
+    /// Instellingen (thema, herinneringen, filters, importkoppelingen, ...)
+    /// zoals `SettingsMigrator.snapshot` ze leest. Optioneel en door oudere
+    /// app-versies genegeerd, dus geen nieuwe `formatVersion` nodig; ontbreekt
+    /// bij backups van vóór deze versie (`nil` → instellingen blijven staan).
+    public var settings: [String: SettingValue]? = nil
+
     // MARK: - DTO's
 
     public struct AccountDTO: Codable, Equatable {

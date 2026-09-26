@@ -10,7 +10,7 @@ struct DashboardView: View {
     @Query(sort: \Playbook.name) private var playbooks: [Playbook]
     @Query(sort: \Confluence.sortOrder) private var confluences: [Confluence]
 
-    @State private var viewModel = DashboardViewModel()
+    @State private var viewModel = DashboardViewModel(filterSettings: DashboardFilterSettings())
 
     private let statsService = StatsService()
 
@@ -84,6 +84,17 @@ struct DashboardView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Trade.self) { trade in
                 TradeDetailView(trade: trade)
+            }
+            // Filters overleven een herstart/update (DashboardFilterSettings).
+            .onChange(of: viewModel.filterState) { _, _ in
+                viewModel.saveFilters()
+            }
+            .task {
+                viewModel.pruneFilters(
+                    accountIDs: Set(accounts.map(\.id)),
+                    playbookIDs: Set(playbooks.map(\.id)),
+                    confluenceIDs: Set(confluences.map(\.id))
+                )
             }
         }
     }

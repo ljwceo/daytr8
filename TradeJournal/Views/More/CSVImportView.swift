@@ -15,7 +15,7 @@ struct CSVImportView: View {
     @Query(sort: \Instrument.sortOrder) private var instruments: [Instrument]
     @Query private var existingTrades: [Trade]
 
-    @State private var viewModel = CSVImportViewModel()
+    @State private var viewModel = CSVImportViewModel(mappingStore: CSVMappingStore())
     @State private var isImporterPresented = false
     @State private var showPreview = false
 

@@ -30,6 +30,12 @@ final class ThemeStore {
         self.palette = ThemePalette.palette(withID: defaults.string(forKey: Keys.selectedPaletteID)) ?? .standard
     }
 
+    /// Leest de keuze opnieuw uit `UserDefaults` (na het terugzetten van een backup).
+    func reload() {
+        let stored = ThemePalette.palette(withID: defaults.string(forKey: Keys.selectedPaletteID)) ?? .standard
+        if stored != palette { palette = stored }
+    }
+
     /// Kiest en bewaart een thema.
     func select(_ palette: ThemePalette) {
         guard palette != self.palette else { return }
