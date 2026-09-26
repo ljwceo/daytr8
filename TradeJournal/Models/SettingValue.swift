@@ -17,7 +17,7 @@ public enum SettingValue: Codable, Equatable, Sendable {
         case let number as NSNumber:
             if CFGetTypeID(number) == CFBooleanGetTypeID() {
                 self = .bool(number.boolValue)
-            } else if CFNumberIsFloatType(number) {
+            } else if CFNumberIsFloatType(number as CFNumber) {
                 self = .double(number.doubleValue)
             } else {
                 self = .int(number.intValue)

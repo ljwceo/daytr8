@@ -118,6 +118,8 @@ struct DashboardView: View {
             }
             .onChange(of: liveQuoteEnabled) { _, _ in updateLiveQuotePolling() }
             .task {
+                // Alleen met geladen data opruimen; een lege store wist geen bewaarde filters.
+                guard !trades.isEmpty else { return }
                 viewModel.pruneFilters(
                     accountIDs: Set(accounts.map(\.id)),
                     playbookIDs: Set(playbooks.map(\.id)),

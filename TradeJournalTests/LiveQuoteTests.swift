@@ -2,6 +2,21 @@ import XCTest
 import SwiftData
 @testable import TradeJournal
 
+/// Nep-koersbron: geeft de resultaten op volgorde terug (de laatste blijft herhalen).
+private final class MockProvider: QuoteProviding, @unchecked Sendable {
+    var results: [Result<LiveQuote, LiveQuoteError>]
+    private(set) var requested: [String] = []
+    var sourceName: String { "Test" }
+
+    init(_ results: [Result<LiveQuote, LiveQuoteError>]) { self.results = results }
+
+    func quote(for symbol: QuoteSymbol) async throws -> LiveQuote {
+        requested.append(symbol.providerSymbol)
+        let result = results.count > 1 ? results.removeFirst() : results[0]
+        return try result.get()
+    }
+}
+
 @MainActor
 final class LiveQuoteTests: XCTestCase {
 
@@ -99,20 +114,6 @@ final class LiveQuoteTests: XCTestCase {
     }
 
     // MARK: - Viewmodel
-
-    private final class MockProvider: QuoteProviding, @unchecked Sendable {
-        var results: [Result<LiveQuote, LiveQuoteError>]
-        private(set) var requested: [String] = []
-        var sourceName: String { "Test" }
-
-        init(_ results: [Result<LiveQuote, LiveQuoteError>]) { self.results = results }
-
-        func quote(for symbol: QuoteSymbol) async throws -> LiveQuote {
-            requested.append(symbol.providerSymbol)
-            let result = results.count > 1 ? results.removeFirst() : results[0]
-            return try result.get()
-        }
-    }
 
     private func quote(_ symbol: QuoteSymbol, open: Bool) -> LiveQuote {
         LiveQuote(symbol: symbol, price: 100, previousClose: 99, currency: "USD", lastUpdate: Date(),

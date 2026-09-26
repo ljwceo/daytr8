@@ -236,7 +236,7 @@ public struct CSVImportService {
 
         return trades.enumerated().map { index, trade in
             let fingerprint = trade.fingerprint
-            let isDuplicate = seen.contains(fingerprint) || (trade.sourceID.map(seenIDs.contains) ?? false)
+            let isDuplicate = seen.contains(fingerprint) || (trade.sourceID.map { seenIDs.contains($0) } ?? false)
             seen.insert(fingerprint)
             if let sourceID = trade.sourceID { seenIDs.insert(sourceID) }
             return PreviewItem(
@@ -307,7 +307,7 @@ public struct CSVImportService {
             let instrument = instrumentsBySymbol[imported.symbol.uppercased()]
             let spec = Self.tickSpec(for: imported, instrument: instrument)
             let hasFills = !imported.fills.isEmpty
-            let account = Self.account(for: imported, selected: account, accounts: accounts)
+            let tradeAccount = Self.account(for: imported, selected: account, accounts: accounts)
             var id = UUID()
             if let sourceID = imported.sourceID, !usedIDs.contains(sourceID) { id = sourceID }
             usedIDs.insert(id)
@@ -329,8 +329,8 @@ public struct CSVImportService {
                 tickSize: spec.tickSize,
                 tickValue: spec.tickValue,
                 notes: imported.notes,
-                isBacktest: account?.type == .backtest,
-                account: account,
+                isBacktest: tradeAccount?.type == .backtest,
+                account: tradeAccount,
                 instrument: instrument
             )
             context.insert(trade)
