@@ -95,7 +95,9 @@ Regels:
   tekent een view niet mee bij een themawissel.
 - Nieuw palet of nieuwe token? Voeg hem toe aan **alle** paletten;
   `ThemeStoreTests` controleert WCAG AA-contrast.
-- Tekst op een accentvlak: `Theme.onAccent` (niet wit).
+- Tekst op een accentvlak: `Theme.onAccent` (niet wit, niet `textPrimary`).
+- Rijen in `List`/`Form`: zet `.listRowBackground(Theme.card)` op elke `Section`
+  (of losse rij), anders krijgen ze de systeemkleur i.p.v. de themakleur.
 - Semantiek:
   - `Theme.profit` (groen) voor winst / positief resultaat
   - `Theme.loss` (rood) voor verlies / negatief resultaat
