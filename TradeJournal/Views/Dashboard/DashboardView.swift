@@ -89,6 +89,12 @@ struct DashboardView: View {
                 }
             }
             .navigationTitle("Dashboard")
+            .toolbar {
+                // Woordmerk klein boven de grote titel.
+                ToolbarItem(placement: .topBarLeading) {
+                    Daytr8LogoView(variant: .wordmark, size: 20)
+                }
+            }
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Trade.self) { trade in

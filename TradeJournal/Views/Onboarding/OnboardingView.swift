@@ -111,13 +111,18 @@ private struct OnboardingPageView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: step.systemImage)
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 64, height: 64)
-                    .background(Theme.accent.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                    .accessibilityHidden(true)
+                if step == .welcome {
+                    Daytr8LogoView(variant: .wordmark, size: 40)
+                        .padding(.vertical, 8)
+                } else {
+                    Image(systemName: step.systemImage)
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 64, height: 64)
+                        .background(Theme.accent.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                        .accessibilityHidden(true)
+                }
 
                 Text(step.title)
                     .font(.title2.weight(.bold))

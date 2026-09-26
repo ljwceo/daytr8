@@ -1,0 +1,20 @@
+<!-- Daytr8 — woordmerk. Geometrie gelijk aan Daytr8EightShape (kader 100 x 140).
+     Kleuren via CSS-variabelen, zodat het logo het actieve thema volgt:
+       --daytr8-accent  (accentdeel, standaard Donker-accent #5AB0FF)
+       --daytr8-text    (tekst, standaard Donker-textPrimary #F2F3F5) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" role="img" aria-label="Daytr8">
+  <defs>
+    <mask id="daytr8-wordmark-eight" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="140">
+      <path d="M8,0 H62 A30,30 0 0 1 92,30 V36 A30,30 0 0 1 62,66 H38 A30,30 0 0 1 8,36 V0 Z" fill="#fff"/><path d="M36,58 H64 A36,36 0 0 1 100,94 V140 H36 A36,36 0 0 1 0,104 V94 A36,36 0 0 1 36,58 Z" fill="#fff"/>
+      <path d="M43,22 H57 A11,11 0 0 1 68,33 V33 A11,11 0 0 1 57,44 H43 A11,11 0 0 1 32,33 V33 A11,11 0 0 1 43,22 Z" fill="#000"/><path d="M46,82 H54 A18,18 0 0 1 72,100 V100 A18,18 0 0 1 54,118 H46 A18,18 0 0 1 28,100 V100 A18,18 0 0 1 46,82 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <text x="0" y="88" textLength="296" lengthAdjust="spacingAndGlyphs"
+        font-family="-apple-system, 'SF Pro Display', Inter, 'Helvetica Neue', Arial, sans-serif"
+        font-size="100" font-weight="900" letter-spacing="-3.5"
+        style="fill: var(--daytr8-text, #F2F3F5)">Daytr</text>
+  <!-- "8" op hoofdletterhoogte (0,72 x lettergrootte), op de basislijn -->
+  <g transform="translate(302 16) scale(0.5143)">
+    <rect width="100" height="140" mask="url(#daytr8-wordmark-eight)" style="fill: var(--daytr8-accent, #5AB0FF)"/>
+  </g>
+</svg>

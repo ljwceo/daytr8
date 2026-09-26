@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>nl_NL</string>
     <key>CFBundleDisplayName</key>
-    <string>TradeJournal</string>
+    <string>Daytr8</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -25,7 +25,9 @@
     <key>UILaunchScreen</key>
     <dict>
         <key>UIColorName</key>
-        <string></string>
+        <string>LaunchBackground</string>
+        <key>UIImageName</key>
+        <string>LaunchLogo</string>
     </dict>
     <key>UIRequiredDeviceCapabilities</key>
     <array>

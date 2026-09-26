@@ -29,12 +29,21 @@ struct TradeJournalApp: App {
     /// Welkomstmelding, rondleiding en tabselectie.
     @State private var onboarding = OnboardingViewModel()
 
+    /// Laadscherm met het woordmerk tot de start-taken klaar zijn.
+    @State private var isSplashVisible = true
+
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .overlay {
                     if appLock.isLocked {
                         AppLockOverlayView(viewModel: appLock)
+                    }
+                }
+                .overlay {
+                    if isSplashVisible {
+                        SplashView()
+                            .transition(.opacity)
                     }
                 }
                 .environment(appLock)
@@ -47,6 +56,9 @@ struct TradeJournalApp: App {
                     SeedService.seedDefaultsIfNeeded(in: container.mainContext)
                     // Automatische backup naar de gekozen map (als ingesteld).
                     AutoBackupService().runIfDue(context: container.mainContext, isLaunch: true)
+                    // Laadscherm kort laten staan en dan uitfaden.
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    withAnimation(.easeOut(duration: 0.3)) { isSplashVisible = false }
                     // Eerste start: welkomstmelding (verschijnt na ontgrendelen).
                     onboarding.handleLaunch()
                     // Koude start: direct om ontgrendeling vragen als het slot aan staat.

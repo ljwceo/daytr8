@@ -41,12 +41,13 @@ targets:
     info:
       path: TradeJournal/Resources/Info.plist
       properties:
-        CFBundleDisplayName: TradeJournal
+        CFBundleDisplayName: Daytr8
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: LaunchBackground
+          UIImageName: LaunchLogo
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
