@@ -126,19 +126,50 @@ public final class BackupViewModel {
     // MARK: - Restore
 
     /// Leest een gekozen backup in (nog zonder iets te wissen) en vraagt om
-    /// bevestiging. Het bestand wordt eerst naar de tijdelijke map gekopieerd
-    /// zodat het na het sluiten van de security scope leesbaar blijft.
+    /// bevestiging.
+    ///
+    /// `url` mag de `.zip` zijn, maar ook de map die de Bestanden-app ervan
+    /// maakt als je op de zip tikt, of alleen `backup.json` daaruit. Alles
+    /// wordt eerst naar de tijdelijke map gekopieerd (gecoördineerd, zodat
+    /// iCloud-bestanden die nog niet lokaal staan eerst gedownload worden) en
+    /// blijft zo leesbaar na het sluiten van de security scope.
     public func prepareRestore(from url: URL) {
         perform {
             let didAccess = url.startAccessingSecurityScopedResource()
             defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
 
-            let local = FileManager.default.temporaryDirectory
-                .appendingPathComponent("restore-\(UUID().uuidString).zip")
-            try FileManager.default.copyItem(at: url, to: local)
+            let workDirectory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("restore-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+            let local = workDirectory.appendingPathComponent(url.lastPathComponent)
+            try Self.coordinatedCopy(from: url, to: local)
+
+            // Los gekozen backup.json: probeer de images-map ernaast mee te
+            // nemen (lukt alleen als iOS er toegang toe geeft; anders worden
+            // de screenshots bij de restore overgeslagen).
+            if url.pathExtension.lowercased() == "json" {
+                let images = url.deletingLastPathComponent().appendingPathComponent("images", isDirectory: true)
+                try? Self.coordinatedCopy(from: images, to: workDirectory.appendingPathComponent("images", isDirectory: true))
+            }
+
             self.pendingRestore = try self.backupService.loadBackup(at: local)
             self.isConfirmingRestore = true
         }
+    }
+
+    /// Kopieert een bestand of map via `NSFileCoordinator`, zodat iCloud-
+    /// bestanden eerst lokaal gedownload worden.
+    private static func coordinatedCopy(from source: URL, to destination: URL) throws {
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { readURL in
+            do {
+                try FileManager.default.copyItem(at: readURL, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+        if let error = coordinationError ?? copyError { throw error }
     }
 
     public func confirmRestore(into context: ModelContext) {

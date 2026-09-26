@@ -1187,6 +1187,24 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
 - CSV-import neemt geen tags/confluences/playbook over; voor een volledige
   overzetting blijft de backup (.zip) de weg.
 
+## Herstellen uit een uitgepakte backup (fix na test op toestel)
+
+- Probleem: tik je in de Bestanden-app op een backup-`.zip`, dan pakt iOS hem
+  uit tot een map met `backup.json` en `images/`. Het herstelscherm accepteerde
+  alleen `.zip`, dus zo'n backup was niet meer terug te zetten.
+- Fix: `Services/BackupArchive.swift` — `BackupArchive` (zip of map),
+  `BackupFolder` en `BackupArchiveOpener`, die op inhoud herkent: een map met
+  `backup.json` (ook één niveau diep), een zip (ook zonder extensie) of een los
+  JSON-bestand. `BackupService.loadBackup(at:)` gebruikt die.
+- `BackupViewModel.prepareRestore` kopieert zip, map of json gecoördineerd
+  (`NSFileCoordinator`), zodat iCloud-bestanden eerst gedownload worden; bij een
+  losse `backup.json` wordt de `images/`-map ernaast meegenomen als dat mag.
+- `BackupView`: de bestandskiezer accepteert `.zip`, mappen en `.json`; de
+  uitleg zegt dat de map de voorkeur heeft (dan komen screenshots mee).
+- Tests (`BackupServiceTests`): restore uit uitgepakte map incl. screenshots,
+  map daarboven, losse json (screenshots overgeslagen), zip zonder extensie,
+  lege map → "backup.json ontbreekt".
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen

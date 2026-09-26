@@ -242,6 +242,74 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(trade.executions.count, 2)
     }
 
+    // MARK: - Uitgepakte backups (Bestanden-app pakt een .zip uit bij tikken)
+
+    /// Pakt de zip uit zoals de Bestanden-app doet: een map met
+    /// `backup.json` en `images/`.
+    private func unzipLikeFilesApp(_ zip: URL, into folderName: String) throws -> URL {
+        let reader = try ZipReader(url: zip)
+        let folder = directory.appendingPathComponent(folderName, isDirectory: true)
+        for entry in reader.entries {
+            let target = folder.appendingPathComponent(entry.path)
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try reader.extract(entry).write(to: target)
+        }
+        return folder
+    }
+
+    func test_restore_fromUnzippedFolder_includesScreenshots() throws {
+        let fixture = try makeFixture()
+        let tradeID = fixture.trade.id
+        let zip = try service.exportBackup(from: context, to: directory)
+        let folder = try unzipLikeFilesApp(zip, into: "TradeJournal-backup-2026-09-23")
+
+        let loaded = try service.loadBackup(at: folder)
+        XCTAssertEqual(loaded.summary.tradeCount, 1)
+        XCTAssertEqual(loaded.summary.screenshotCount, 3)
+        try service.restore(loaded, into: context)
+
+        let trade = try XCTUnwrap(try context.fetch(FetchDescriptor<Trade>()).first)
+        XCTAssertEqual(trade.id, tradeID)
+        XCTAssertEqual(trade.screenshots.count, 2)
+        XCTAssertTrue(trade.screenshots.allSatisfy { !$0.imageData.isEmpty })
+    }
+
+    func test_loadBackup_fromParentOfUnzippedFolder() throws {
+        try makeFixture()
+        let zip = try service.exportBackup(from: context, to: directory)
+        let folder = try unzipLikeFilesApp(zip, into: "Downloads/TradeJournal-backup-2026-09-23")
+        let loaded = try service.loadBackup(at: folder.deletingLastPathComponent())
+        XCTAssertEqual(loaded.summary.tradeCount, 1)
+    }
+
+    func test_restore_fromLooseBackupJSON_skipsMissingImages() throws {
+        try makeFixture()
+        let zip = try service.exportBackup(from: context, to: directory)
+        let json = directory.appendingPathComponent("backup 2.json")
+        try ZipReader(url: zip).data(for: BackupService.payloadPath).write(to: json)
+
+        try service.restore(try service.loadBackup(at: json), into: context)
+        let trade = try XCTUnwrap(try context.fetch(FetchDescriptor<Trade>()).first)
+        XCTAssertEqual(trade.executions.count, 2)
+        XCTAssertTrue(trade.screenshots.isEmpty)
+    }
+
+    func test_loadBackup_zipWithoutExtension_isRecognisedByContent() throws {
+        try makeFixture()
+        let zip = try service.exportBackup(from: context, to: directory)
+        let renamed = directory.appendingPathComponent("backup-zonder-extensie")
+        try FileManager.default.copyItem(at: zip, to: renamed)
+        XCTAssertEqual(try service.loadBackup(at: renamed).summary.tradeCount, 1)
+    }
+
+    func test_loadBackup_folderWithoutPayload_throwsMissingPayload() throws {
+        let empty = directory.appendingPathComponent("leeg", isDirectory: true)
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        XCTAssertThrowsError(try service.loadBackup(at: empty)) { error in
+            XCTAssertEqual(error as? BackupService.BackupError, .missingPayload)
+        }
+    }
+
     func test_fileExtension() {
         XCTAssertEqual(BackupService.fileExtension(for: jpegData), "jpg")
         XCTAssertEqual(BackupService.fileExtension(for: pngData), "png")
