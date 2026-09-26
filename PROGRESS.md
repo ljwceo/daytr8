@@ -1118,6 +1118,75 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
 - Nog niet op het toestel getest.
 - Nieuwe `List`/`Form`-secties: geef ze `.listRowBackground(Theme.card)` mee.
 
+## Vijf fixes/features na test op toestel (maanddoel, live koers, persistentie, import, logo)
+
+### 1. Maanddoel telde verkeerd (US$ 102 i.p.v. US$ 148)
+- Oorzaak: `GoalsService` telde alleen trades mét `exitDate`; de kalender telt
+  `exitDate ?? entryDate`. Een uitgebreide trade met exit-prijs maar zonder
+  exit-tijd (standaard in het formulier) viel zo buiten het maanddoel én de
+  daily loss limit.
+- Fix: `CalendarAggregationService.referenceDate(for:)` en
+  `netPnL(of:in:)`/`netPnL(of:periodOf:containing:)`; `GoalsService` gebruikt
+  die, dus doelen en kalendertotalen delen één berekening. Netto na kosten,
+  tijdzone van de gebruiker, maandgrens exclusief.
+- "Lice account" komt niet uit de code: dat is de ingevulde accountnaam
+  (aan te passen onder Meer → Accounts).
+- Tests (`GoalsServiceTests`): +46 en +102 → 148, verliezen/kosten, negatieve
+  maand, maandgrens, tijdzone, daily loss zonder exit-tijd.
+
+### 2. Live koers op het dashboard
+- Bron: Yahoo Finance chart-API (gratis, geen key; futures ±10 min vertraagd).
+- `Models/LiveQuote.swift`, `Services/QuoteSymbolResolver.swift` (MNQZ26 →
+  MNQ=F, forex, indexen, crypto, aandelen), `Services/LiveQuoteService.swift`
+  (`QuoteProviding` + `YahooQuoteProvider`, basis-URL via Info.plist
+  `LiveQuoteBaseURL`), `Services/LiveQuoteSettings.swift`,
+  `ViewModels/LiveQuoteViewModel.swift` (polling 30 s / 5 min / 60 s na fout),
+  `Views/Dashboard/LiveQuoteCardView.swift`, `Views/More/LiveQuoteSettingsView.swift`.
+- Pollen alleen als de app actief is en het dashboard zichtbaar.
+- Tests: `LiveQuoteTests`.
+
+### 3. Presets en instellingen blijven bewaard
+- `AppSchemaV1` + `AppMigrationPlan`; `Services/PersistenceController.swift`
+  opent altijd dezelfde `default.store` met migratieplan en maakt bij een
+  mislukte migratie eerst een kopie in `StoreRecovery/` (niets wordt gewist).
+- `Services/SettingsMigrator.swift`: `settings.schemaVersion` + migraties,
+  draait vóór alle andere UserDefaults-lezers (bovenaan `TradeJournalApp`).
+- Instrumentpresets worden elk maar één keer ingeschoten
+  (`seed.seededInstrumentSymbols`).
+- Dashboardfilters (`Services/DashboardFilterSettings.swift`) en handmatige
+  CSV-koppelingen (`Services/CSVMappingStore.swift`) worden bewaard.
+- Instellingen gaan mee in de backup (`BackupPayload.settings`, optioneel).
+- Tests (`PersistenceTests`): herstart met store op schijf, upgrade vanaf een
+  ongeversioneerde store, instellingen-migraties (incl. gesimuleerde hernoeming),
+  filters, koppelingen, instellingen via backup.
+
+### 4. Import van eigen export
+- Oorzaken: `net_pnl` werd genegeerd, snelle trades (zonder prijzen) kwamen
+  binnen als open trade met $0, het account ging verloren.
+- Fix: velden `net_pnl`, `account`, `trade_id`; rij met netto P&L zonder
+  exit-prijs = gesloten (→ `manualNetPnL`); netto P&L wordt bewaard als het
+  niet uit de prijzen volgt; account op naam; trade-id hergebruikt en gebruikt
+  voor duplicaatdetectie.
+- Robuuster: generieke preset met Engelse/Nederlandse kolomnamen, decimale komma
+  in `;`-bestanden, datums met maandnaam (`24 sep 2026`, `Sep 24, 2026`).
+- Tests: round-trip (snel, uitgebreid, broker-resultaat), herimport =
+  duplicaat, Europese CSV, parser-varianten.
+
+### 5. Logo "Daytr8"
+- `Views/Components/Daytr8LogoView.swift` (`Daytr8EightShape`, woordmerk en
+  icoon, kleuren uit `Theme`), `Views/Components/SplashView.swift`.
+- Op dashboard (boven de titel), onboarding-welkomststap, welkomstmelding en
+  laadscherm. Launchscreen: `LaunchBackground` + `LaunchLogo`.
+- App-icoon, favicons en SVG's in `Branding/` (script `generate_icons.py`).
+- Weergavenaam op het beginscherm: Daytr8 (bundle id ongewijzigd).
+- Tests: `Daytr8LogoTests` (contrast alle thema's, vorm).
+
+### Openstaand
+- Nog niet op het toestel getest (live koers: gedrag van Yahoo buiten
+  handelsuren en rond feestdagen).
+- CSV-import neemt geen tags/confluences/playbook over; voor een volledige
+  overzetting blijft de backup (.zip) de weg.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen

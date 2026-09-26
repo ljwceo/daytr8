@@ -49,7 +49,13 @@ public struct BackupService {
         let reader: ZipReader
     }
 
-    public init() {}
+    /// Waar instellingen vandaan komen (export) en naartoe gaan (restore).
+    /// `nil` = instellingen niet meenemen.
+    public var settingsDefaults: UserDefaults?
+
+    public init(settingsDefaults: UserDefaults? = .standard) {
+        self.settingsDefaults = settingsDefaults
+    }
 
     // MARK: - Export
 
@@ -200,6 +206,7 @@ public struct BackupService {
         payload.journalTemplates = templateDTOs
         payload.dailyRules = ruleDTOs
         payload.notebookNotes = noteDTOs
+        payload.settings = settingsDefaults.map { SettingsMigrator.snapshot(from: $0) }
 
         try writer.addFile(path: Self.payloadPath, data: try Self.encoder.encode(payload), compress: true)
         try writer.finish()
@@ -400,6 +407,11 @@ public struct BackupService {
         restoreFormatVersion2(payload, trades: tradesByID, into: context)
 
         try context.save()
+
+        if let settings = payload.settings, let defaults = settingsDefaults {
+            SettingsMigrator.restore(settings, into: defaults)
+            if defaults === UserDefaults.standard { ThemeStore.shared.reload() }
+        }
         return backup.summary
     }
 

@@ -55,17 +55,67 @@ public final class DashboardViewModel {
     public let aggregationService: CalendarAggregationService
     public let scoreService: TradingScoreService
     public let goalsService: GoalsService
+    /// Bewaart de filters tussen app-starts; `nil` = niet bewaren (tests, previews).
+    @ObservationIgnored private let filterSettings: DashboardFilterSettings?
 
     public init(
         statsService: StatsService = StatsService(),
         aggregationService: CalendarAggregationService = CalendarAggregationService(),
         scoreService: TradingScoreService = TradingScoreService(),
-        goalsService: GoalsService = GoalsService()
+        goalsService: GoalsService = GoalsService(),
+        filterSettings: DashboardFilterSettings? = nil
     ) {
         self.statsService = statsService
         self.aggregationService = aggregationService
         self.scoreService = scoreService
         self.goalsService = goalsService
+        self.filterSettings = filterSettings
+        if let saved = filterSettings?.load() {
+            apply(saved)
+        }
+    }
+
+    // MARK: - Filters bewaren
+
+    /// Alle filters als één waarde (om te bewaren en wijzigingen te volgen).
+    public var filterState: DashboardFilterState {
+        DashboardFilterState(
+            selectedAccountIDs: selectedAccountIDs.sorted { $0.uuidString < $1.uuidString },
+            period: period.rawValue,
+            customStart: customRange?.lowerBound,
+            customEnd: customRange?.upperBound,
+            symbolFilter: symbolFilter,
+            playbookID: playbookID,
+            confluenceID: confluenceID,
+            includeBacktest: includeBacktest
+        )
+    }
+
+    public func apply(_ state: DashboardFilterState) {
+        selectedAccountIDs = Set(state.selectedAccountIDs)
+        period = Period(rawValue: state.period) ?? .all
+        if let start = state.customStart, let end = state.customEnd, start <= end {
+            customRange = start...end
+        } else {
+            customRange = nil
+        }
+        symbolFilter = state.symbolFilter
+        playbookID = state.playbookID
+        confluenceID = state.confluenceID
+        includeBacktest = state.includeBacktest
+    }
+
+    public func saveFilters() {
+        filterSettings?.save(filterState)
+    }
+
+    /// Laat filters vallen die naar verwijderde accounts/playbooks/confluences
+    /// wijzen, zodat een bewaard filter het dashboard niet leeg houdt.
+    public func pruneFilters(accountIDs: Set<UUID>, playbookIDs: Set<UUID>, confluenceIDs: Set<UUID>) {
+        let accounts = selectedAccountIDs.intersection(accountIDs)
+        if accounts != selectedAccountIDs { selectedAccountIDs = accounts }
+        if let playbookID, !playbookIDs.contains(playbookID) { self.playbookID = nil }
+        if let confluenceID, !confluenceIDs.contains(confluenceID) { self.confluenceID = nil }
     }
 
     // MARK: - Accountfilter

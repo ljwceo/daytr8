@@ -4,6 +4,23 @@ import SwiftData
 @main
 struct TradeJournalApp: App {
 
+    /// Staat bewust bovenaan: eigenschappen worden in declaratievolgorde
+    /// geïnitialiseerd, en de instellingen-migratie moet vóór de andere
+    /// (UserDefaults-lezende) eigenschappen draaien.
+    ///
+    /// Eén centrale `ModelContainer` voor de hele app — bevat het volledige
+    /// schema uit `AppSchema.models`, met migratieplan (zie `PersistenceController`).
+    let container: ModelContainer = {
+        // Instellingen (UserDefaults) naar de huidige versie brengen vóórdat
+        // iets ze leest.
+        SettingsMigrator.migrateIfNeeded()
+        do {
+            return try PersistenceController.makeContainer()
+        } catch {
+            fatalError("Kon SwiftData ModelContainer niet initialiseren: \(error)")
+        }
+    }()
+
     @Environment(\.scenePhase) private var scenePhase
 
     /// App-slot (Face ID / code), gedeeld met het instellingenscherm via de environment.
@@ -12,15 +29,8 @@ struct TradeJournalApp: App {
     /// Welkomstmelding, rondleiding en tabselectie.
     @State private var onboarding = OnboardingViewModel()
 
-    /// Eén centrale `ModelContainer` voor de hele app — bevat het volledige
-    /// schema uit `AppSchema.models`.
-    let container: ModelContainer = {
-        do {
-            return try ModelContainer(for: Schema(AppSchema.models))
-        } catch {
-            fatalError("Kon SwiftData ModelContainer niet initialiseren: \(error)")
-        }
-    }()
+    /// Laadscherm met het woordmerk tot de start-taken klaar zijn.
+    @State private var isSplashVisible = true
 
     var body: some Scene {
         WindowGroup {
@@ -28,6 +38,12 @@ struct TradeJournalApp: App {
                 .overlay {
                     if appLock.isLocked {
                         AppLockOverlayView(viewModel: appLock)
+                    }
+                }
+                .overlay {
+                    if isSplashVisible {
+                        SplashView()
+                            .transition(.opacity)
                     }
                 }
                 .environment(appLock)
@@ -40,6 +56,9 @@ struct TradeJournalApp: App {
                     SeedService.seedDefaultsIfNeeded(in: container.mainContext)
                     // Automatische backup naar de gekozen map (als ingesteld).
                     AutoBackupService().runIfDue(context: container.mainContext, isLaunch: true)
+                    // Laadscherm kort laten staan en dan uitfaden.
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    withAnimation(.easeOut(duration: 0.3)) { isSplashVisible = false }
                     // Eerste start: welkomstmelding (verschijnt na ontgrendelen).
                     onboarding.handleLaunch()
                     // Koude start: direct om ontgrendeling vragen als het slot aan staat.

@@ -52,6 +52,13 @@ public struct ImportedTrade: Equatable, Sendable {
     /// P&L zoals de broker hem rapporteert (alleen ter controle / om de
     /// puntwaarde van onbekende instrumenten af te leiden).
     public var reportedPnL: Double?
+    /// Netto resultaat na kosten zoals het bestand het meldt. Wordt bewaard
+    /// als het niet uit de prijzen volgt (snelle trades, broker-resultaat).
+    public var reportedNetPnL: Double?
+    /// Accountnaam uit het bestand (eigen export).
+    public var accountName: String?
+    /// Trade-id uit het bestand (eigen export).
+    public var sourceID: UUID?
     public var notes: String
     /// De fills waaruit de trade is opgebouwd (leeg bij round-trip-imports).
     public var fills: [ImportedFill]
@@ -73,7 +80,10 @@ public struct ImportedTrade: Equatable, Sendable {
         reportedPnL: Double? = nil,
         notes: String = "",
         fills: [ImportedFill] = [],
-        sourceRows: [Int] = []
+        sourceRows: [Int] = [],
+        reportedNetPnL: Double? = nil,
+        accountName: String? = nil,
+        sourceID: UUID? = nil
     ) {
         self.symbol = symbol
         self.direction = direction
@@ -90,9 +100,12 @@ public struct ImportedTrade: Equatable, Sendable {
         self.notes = notes
         self.fills = fills
         self.sourceRows = sourceRows
+        self.reportedNetPnL = reportedNetPnL
+        self.accountName = accountName
+        self.sourceID = sourceID
     }
 
-    public var isOpen: Bool { exitPrice == nil }
+    public var isOpen: Bool { exitDate == nil && exitPrice == nil }
 
     /// Vingerafdruk voor duplicaatdetectie: symbool, richting, entry-tijd
     /// (op de seconde), aantal en entry-prijs.

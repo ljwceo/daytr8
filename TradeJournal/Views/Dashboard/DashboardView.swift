@@ -10,7 +10,12 @@ struct DashboardView: View {
     @Query(sort: \Playbook.name) private var playbooks: [Playbook]
     @Query(sort: \Confluence.sortOrder) private var confluences: [Confluence]
 
-    @State private var viewModel = DashboardViewModel()
+    @State private var viewModel = DashboardViewModel(filterSettings: DashboardFilterSettings())
+    @State private var liveQuote = LiveQuoteViewModel()
+
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(LiveQuoteSettings.Keys.isEnabled) private var liveQuoteEnabled = true
+    @AppStorage(LiveQuoteSettings.Keys.symbolOverride) private var liveQuoteSymbolOverride = ""
 
     private let statsService = StatsService()
 
@@ -32,6 +37,10 @@ struct DashboardView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
+                            if liveQuoteEnabled, liveQuote.symbol != nil {
+                                LiveQuoteCardView(viewModel: liveQuote)
+                            }
+
                             BackupReminderBannerView()
 
                             let goals = viewModel.goalStatuses(accounts: accounts, trades: trades)
@@ -80,11 +89,51 @@ struct DashboardView: View {
                 }
             }
             .navigationTitle("Dashboard")
+            .toolbar {
+                // Woordmerk klein boven de grote titel.
+                ToolbarItem(placement: .topBarLeading) {
+                    Daytr8LogoView(variant: .wordmark, size: 20)
+                }
+            }
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Trade.self) { trade in
                 TradeDetailView(trade: trade)
             }
+            // Filters overleven een herstart/update (DashboardFilterSettings).
+            .onChange(of: viewModel.filterState) { _, _ in
+                viewModel.saveFilters()
+            }
+            // Live koers: alleen pollen als de app actief is én het dashboard
+            // zichtbaar is; op de achtergrond of in een andere tab stopt het.
+            .onAppear {
+                liveQuote.update(trades: trades)
+                updateLiveQuotePolling()
+            }
+            .onDisappear { liveQuote.stop() }
+            .onChange(of: scenePhase) { _, _ in updateLiveQuotePolling() }
+            .onChange(of: LiveQuoteViewModel.symbol(for: trades, override: liveQuoteSymbolOverride)) { _, _ in
+                liveQuote.update(trades: trades)
+                updateLiveQuotePolling()
+            }
+            .onChange(of: liveQuoteEnabled) { _, _ in updateLiveQuotePolling() }
+            .task {
+                // Alleen met geladen data opruimen; een lege store wist geen bewaarde filters.
+                guard !trades.isEmpty else { return }
+                viewModel.pruneFilters(
+                    accountIDs: Set(accounts.map(\.id)),
+                    playbookIDs: Set(playbooks.map(\.id)),
+                    confluenceIDs: Set(confluences.map(\.id))
+                )
+            }
+        }
+    }
+
+    private func updateLiveQuotePolling() {
+        if scenePhase == .active, liveQuoteEnabled {
+            liveQuote.start()
+        } else {
+            liveQuote.stop()
         }
     }
 

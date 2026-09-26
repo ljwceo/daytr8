@@ -35,13 +35,19 @@ public struct CalendarAggregationService: Sendable {
         self.statsService = statsService
     }
 
+    /// Het moment waarop een trade in de kalender (en in doelen/limieten)
+    /// meetelt: de exit, of de entry als er geen exit-tijd is — bijv. een
+    /// uitgebreide trade met exit-prijs maar zonder ingevulde exit-tijd.
+    public static func referenceDate(for trade: Trade) -> Date {
+        trade.exitDate ?? trade.entryDate
+    }
+
     /// Groepeert `trades` per dag. Een trade telt mee op de dag van zijn exit;
-    /// nog open trades tellen mee op hun entry-dag.
+    /// zonder exit-tijd op zijn entry-dag (zie `referenceDate(for:)`).
     public func dayAggregates(for trades: [Trade], calendar: Calendar = .current) -> [Date: DayAggregate] {
         var byDay: [Date: [Trade]] = [:]
         for trade in trades {
-            let referenceDate = trade.exitDate ?? trade.entryDate
-            let day = calendar.startOfDay(for: referenceDate)
+            let day = calendar.startOfDay(for: Self.referenceDate(for: trade))
             byDay[day, default: []].append(trade)
         }
 
@@ -62,6 +68,23 @@ public struct CalendarAggregationService: Sendable {
             )
         }
         return result
+    }
+
+    /// Netto P&L (na kosten, alleen gesloten trades) van alle dagen in
+    /// `interval` (start inclusief, eind exclusief). Bouwt op dezelfde
+    /// dagaggregaten als de kalender, zodat maanddoel, daily loss limit en
+    /// kalender-/weektotalen nooit uit elkaar kunnen lopen.
+    public func netPnL(of trades: [Trade], in interval: DateInterval, calendar: Calendar = .current) -> Double {
+        dayAggregates(for: trades, calendar: calendar).values.reduce(0) { sum, day in
+            day.date >= interval.start && day.date < interval.end ? sum + day.netPnL : sum
+        }
+    }
+
+    /// Netto P&L van de dag/week/maand/jaar (`component`) waarin `date` valt,
+    /// in de tijdzone van `calendar`.
+    public func netPnL(of trades: [Trade], periodOf component: Calendar.Component, containing date: Date, calendar: Calendar = .current) -> Double {
+        guard let interval = calendar.dateInterval(of: component, for: date) else { return 0 }
+        return netPnL(of: trades, in: interval, calendar: calendar)
     }
 
     /// Rolt dagaggregaten op naar maandtotalen voor het jaaroverzicht.

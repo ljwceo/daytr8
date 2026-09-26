@@ -12,11 +12,18 @@ import SwiftData
 /// de main-context van een `ModelContainer` hoort op de main thread aangeroepen te worden.
 public enum SeedService {
 
+    public enum Keys {
+        /// `String` (symbolen gescheiden door komma's): instrumentpresets die al
+        /// eens zijn ingeschoten. Een preset die de gebruiker verwijdert komt zo
+        /// niet bij de volgende start terug; een nieuwe preset uit een update wel.
+        public static let seededInstrumentSymbols = "seed.seededInstrumentSymbols"
+    }
+
     /// Voert alle idempotente seeds uit. Veilig om bij elke app-start
     /// te draaien: bestaande entries worden herkend aan hun `symbol`/`name`
     /// in combinatie met `isBuiltIn`.
-    public static func seedDefaultsIfNeeded(in context: ModelContext) {
-        seedInstrumentPresetsIfNeeded(in: context)
+    public static func seedDefaultsIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
+        seedInstrumentPresetsIfNeeded(in: context, defaults: defaults)
         seedConfluencesIfNeeded(in: context)
         seedJournalTemplatesIfNeeded(in: context)
         seedDailyRulesIfNeeded(in: context)
@@ -34,12 +41,24 @@ public enum SeedService {
 
     // MARK: - Presets
 
-    public static func seedInstrumentPresetsIfNeeded(in context: ModelContext) {
+    /// Schiet elke instrumentpreset hooguit één keer in (bijgehouden in
+    /// `Keys.seededInstrumentSymbols`). Bestaande instrumenten worden nooit
+    /// overschreven; aangepaste tick-waardes van de gebruiker blijven staan.
+    public static func seedInstrumentPresetsIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
         let existingSymbols: Set<String> = (fetchAll(Instrument.self, in: context)).reduce(into: []) { acc, inst in
             acc.insert(inst.symbol.uppercased())
         }
+        // Lege store (eerste start, "Alles wissen", nieuwe testcontainer):
+        // opnieuw beginnen, anders zou een oude registratie alles blokkeren.
+        var seeded = existingSymbols.isEmpty ? [] : Set((defaults.string(forKey: Keys.seededInstrumentSymbols) ?? "")
+            .split(separator: ",").map { String($0) })
+        defer { defaults.set(seeded.sorted().joined(separator: ","), forKey: Keys.seededInstrumentSymbols) }
 
-        for def in InstrumentPresets.all where !existingSymbols.contains(def.symbol.uppercased()) {
+        for def in InstrumentPresets.all {
+            let symbol = def.symbol.uppercased()
+            guard !seeded.contains(symbol) else { continue }
+            seeded.insert(symbol)
+            guard !existingSymbols.contains(symbol) else { continue }
             let inst = Instrument(
                 name: def.name,
                 symbol: def.symbol,

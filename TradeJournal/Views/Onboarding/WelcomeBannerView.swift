@@ -14,9 +14,7 @@ struct WelcomeBannerView: View {
         HStack(alignment: .center, spacing: 12) {
             Button(action: onOpen) {
                 HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.headline)
-                        .foregroundStyle(Theme.onAccent)
+                    Daytr8LogoView(variant: .icon, size: 22, eightColor: Theme.onAccent)
                         .frame(width: 38, height: 38)
                         .background(Theme.accent)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))

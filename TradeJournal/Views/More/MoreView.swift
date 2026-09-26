@@ -103,6 +103,11 @@ struct MoreView: View {
                             Label("Herinneringen", systemImage: "bell")
                         }
                         NavigationLink {
+                            LiveQuoteSettingsView()
+                        } label: {
+                            Label("Live koers", systemImage: "dot.radiowaves.left.and.right")
+                        }
+                        NavigationLink {
                             AppLockSettingsView(viewModel: appLock)
                         } label: {
                             Label("App-slot", systemImage: "lock")

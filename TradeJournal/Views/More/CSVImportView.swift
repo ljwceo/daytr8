@@ -15,7 +15,7 @@ struct CSVImportView: View {
     @Query(sort: \Instrument.sortOrder) private var instruments: [Instrument]
     @Query private var existingTrades: [Trade]
 
-    @State private var viewModel = CSVImportViewModel()
+    @State private var viewModel = CSVImportViewModel(mappingStore: CSVMappingStore())
     @State private var isImporterPresented = false
     @State private var showPreview = false
 
@@ -52,7 +52,9 @@ struct CSVImportView: View {
                 switch result {
                 case .success(let url):
                     viewModel.loadFile(at: url)
-                    if viewModel.account == nil {
+                    // Heeft het bestand een accountkolom (eigen export), dan
+                    // koppelen we per trade op naam; anders het eerste account.
+                    if viewModel.account == nil, !viewModel.mapping.isMapped(.account) {
                         viewModel.account = accounts.first
                     }
                 case .failure(let error):
@@ -161,7 +163,7 @@ struct CSVImportView: View {
 
             Section("Account") {
                 Picker("Importeer naar", selection: $viewModel.account) {
-                    Text("Geen account").tag(Optional<Account>.none)
+                    Text(viewModel.mapping.isMapped(.account) ? "Uit accountkolom" : "Geen account").tag(Optional<Account>.none)
                     ForEach(accounts) { account in
                         Text(account.name).tag(Optional(account))
                     }
@@ -231,6 +233,8 @@ private struct CSVImportPreviewView: View {
 
     @Bindable var viewModel: CSVImportViewModel
     let instruments: [Instrument]
+    /// Om per trade op accountnaam te koppelen (accountkolom in het bestand).
+    @Query(sort: \Account.createdAt) private var accounts: [Account]
     let onFinished: () -> Void
 
     var body: some View {
@@ -300,7 +304,7 @@ private struct CSVImportPreviewView: View {
                 Toggle("Duplicaten toch importeren", isOn: $viewModel.includeDuplicates)
             }
             Button {
-                viewModel.importTrades(instruments: instruments, in: modelContext)
+                viewModel.importTrades(instruments: instruments, accounts: accounts, in: modelContext)
             } label: {
                 Label("Importeer \(viewModel.tradesToImportCount) trades", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
@@ -371,7 +375,7 @@ private struct CSVImportPreviewRow: View {
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                     .monospacedDigit()
-                if let pnl = trade.reportedPnL {
+                if let pnl = trade.reportedNetPnL ?? trade.reportedPnL {
                     Text(pnl.formatted(.currency(code: "USD")))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.color(forPnL: pnl))

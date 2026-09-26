@@ -36,10 +36,14 @@ public struct ImportValueParser {
     public var dateOrder: ImportDateOrder
     /// Tijdzone voor datums zonder expliciete offset.
     public var timeZone: TimeZone
+    /// `true` = een losse komma is altijd een decimaalteken ("1,250" → 1,25),
+    /// zoals in puntkomma-gescheiden exports uit een Europese locale.
+    public var prefersDecimalComma: Bool
 
-    public init(dateOrder: ImportDateOrder = .monthFirst, timeZone: TimeZone = .current) {
+    public init(dateOrder: ImportDateOrder = .monthFirst, timeZone: TimeZone = .current, prefersDecimalComma: Bool = false) {
         self.dateOrder = dateOrder
         self.timeZone = timeZone
+        self.prefersDecimalComma = prefersDecimalComma
     }
 
     // MARK: - Getallen
@@ -83,7 +87,7 @@ public struct ImportValueParser {
             // Alleen komma's: één komma die niet exact 3 cijfers scheidt
             // (of met "0" ervoor) is een decimaalteken, anders duizendtallen.
             let parts = text.split(separator: ",", omittingEmptySubsequences: false)
-            if parts.count == 2, parts[1].count != 3 || parts[0] == "0" || parts[0].isEmpty {
+            if parts.count == 2, prefersDecimalComma || parts[1].count != 3 || parts[0] == "0" || parts[0].isEmpty {
                 text = text.replacingOccurrences(of: ",", with: ".")
             } else {
                 text.removeAll { $0 == "," }
@@ -117,14 +121,27 @@ public struct ImportValueParser {
             if text.count == 10 { return Date(timeIntervalSince1970: epoch) }
         }
 
-        guard let datePart = Self.firstMatch(Self.yearFirstPattern, in: text) ?? Self.firstMatch(Self.yearLastPattern, in: text) else {
+        guard let datePart = Self.firstMatch(Self.yearFirstPattern, in: text)
+                ?? Self.firstMatch(Self.yearLastPattern, in: text)
+                ?? Self.firstMatch(Self.dayMonthNamePattern, in: text)
+                ?? Self.firstMatch(Self.monthNameDayPattern, in: text) else {
             return nil
         }
 
         var year = 0
         var month = 0
         var day = 0
-        if datePart.pattern == Self.yearFirstPattern {
+        if datePart.pattern == Self.dayMonthNamePattern {
+            // "24 sep 2026", "24-Sep-2026", "24 september 2026"
+            day = Int(datePart.groups[0]) ?? 0
+            month = Self.monthNumber(datePart.groups[1]) ?? 0
+            year = Int(datePart.groups[2]) ?? 0
+        } else if datePart.pattern == Self.monthNameDayPattern {
+            // "Sep 24, 2026", "September 24 2026"
+            month = Self.monthNumber(datePart.groups[0]) ?? 0
+            day = Int(datePart.groups[1]) ?? 0
+            year = Int(datePart.groups[2]) ?? 0
+        } else if datePart.pattern == Self.yearFirstPattern {
             year = Int(datePart.groups[0]) ?? 0
             month = Int(datePart.groups[1]) ?? 0
             day = Int(datePart.groups[2]) ?? 0
@@ -254,6 +271,19 @@ public struct ImportValueParser {
 
     private static let yearFirstPattern = #"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})"#
     private static let yearLastPattern = #"(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})"#
+    private static let dayMonthNamePattern = #"(\d{1,2})[ \-.]+([A-Za-z]{3,9})\.?[ \-,]+(\d{4})"#
+    private static let monthNameDayPattern = #"([A-Za-z]{3,9})\.?[ \-]+(\d{1,2})(?:st|nd|rd|th)?,?[ \-]+(\d{4})"#
+
+    /// Maandnummer voor Engelse en Nederlandse (afgekorte) maandnamen.
+    static func monthNumber(_ name: String) -> Int? {
+        let key = String(name.lowercased().prefix(3))
+        let months: [String: Int] = [
+            "jan": 1, "feb": 2, "mar": 3, "maa": 3, "apr": 4, "may": 5, "mei": 5, "jun": 6,
+            "jul": 7, "aug": 8, "sep": 9, "oct": 10, "okt": 10, "nov": 11, "dec": 12
+        ]
+        return months[key]
+    }
+
     private static let timePattern = #"(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d+))?\s*([AaPp][Mm])?"#
     private static let offsetPattern = #"(Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$"#
     private static let futureContractPattern = #"^([A-Z0-9]{1,4}?)[FGHJKMNQUVXZ](\d{1,2}|\d{4})$"#

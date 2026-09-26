@@ -45,6 +45,12 @@ public enum CSVImportField: String, Codable, CaseIterable, Identifiable, Sendabl
     case stopLoss = "stop_loss"
     case takeProfit = "take_profit"
     case pnl
+    /// Netto resultaat na kosten (bijv. `net_pnl` uit de eigen export).
+    case netPnL = "net_pnl"
+    /// Accountnaam; wordt gekoppeld aan een bestaand account met die naam.
+    case account
+    /// Stabiele trade-id (eigen export) — voorkomt dubbele trades bij opnieuw importeren.
+    case tradeID = "trade_id"
     case notes
 
     public var id: String { rawValue }
@@ -71,6 +77,9 @@ public enum CSVImportField: String, Codable, CaseIterable, Identifiable, Sendabl
         case .stopLoss: return "Stop loss"
         case .takeProfit: return "Take profit"
         case .pnl: return "P&L (ter controle)"
+        case .netPnL: return "Netto P&L (na kosten)"
+        case .account: return "Account"
+        case .tradeID: return "Trade-id"
         case .notes: return "Notities"
         }
     }
@@ -85,14 +94,15 @@ public enum CSVImportField: String, Codable, CaseIterable, Identifiable, Sendabl
             return [.symbol, .direction, .quantity,
                     .entryTime, .entryPrice, .exitTime, .exitPrice,
                     .buyTime, .buyPrice, .sellTime, .sellPrice,
-                    .stopLoss, .takeProfit, .commission, .fees, .pnl, .notes]
+                    .stopLoss, .takeProfit, .commission, .fees, .pnl, .netPnL,
+                    .account, .tradeID, .notes]
         }
     }
 }
 
 /// Koppeling van CSV-kolommen (op index) aan `CSVImportField`s, plus de
 /// interpretatie-opties die nodig zijn om de waardes te lezen.
-public struct CSVColumnMapping: Equatable, Sendable {
+public struct CSVColumnMapping: Codable, Equatable, Sendable {
     public var mode: CSVImportMode
     /// Veld → kolomindex in `CSVTable.headers`.
     public var columns: [CSVImportField: Int]
