@@ -101,7 +101,7 @@ struct ReportsView: View {
                             .lineLimit(1)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
-                            .foregroundStyle(Theme.textPrimary)
+                            .foregroundStyle(viewModel.selectedTab == tab ? Theme.onAccent : Theme.textPrimary)
                             .background(viewModel.selectedTab == tab ? Theme.accent.opacity(0.85) : Theme.elevated)
                             .clipShape(Capsule())
                     }
