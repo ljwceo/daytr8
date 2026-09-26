@@ -101,6 +101,9 @@ public enum CSVImportPresets {
             .commission: ["commission"],
             .fees: ["fees"],
             .pnl: ["gross_pnl"],
+            .netPnL: ["net_pnl"],
+            .account: ["account"],
+            .tradeID: ["trade_id"],
             .notes: ["notes"]
         ]
     )
@@ -232,6 +235,35 @@ public enum CSVImportPresets {
         ]
     )
 
+    /// Terugval als geen broker-preset herkend wordt: zoekt gangbare
+    /// kolomnamen (Engels en Nederlands) voor complete trades. Wordt nooit
+    /// automatisch gedetecteerd (geen herkenningskolommen), maar door
+    /// `detectOrGeneric` gebruikt zodra de koppeling daarmee compleet is.
+    public static let generic = CSVImportPreset(
+        id: "generic",
+        name: "Automatisch (kolomnamen herkennen)",
+        mode: .trades,
+        identifyingHeaders: [],
+        candidates: [
+            .symbol: ["symbol", "symbool", "instrument", "ticker", "contract", "contractname", "market", "product", "item"],
+            .direction: ["direction", "richting", "side", "kant", "type", "market pos.", "position", "long/short", "buy/sell", "b/s"],
+            .quantity: ["quantity", "qty", "aantal", "size", "contracts", "contracten", "volume", "lots"],
+            .entryTime: ["entry_time", "entry time", "entrytime", "entered at", "enteredat", "open time", "opened", "entry date", "entry datetime", "instap", "instaptijd", "starttijd", "datum", "date", "time", "tijd"],
+            .exitTime: ["exit_time", "exit time", "exittime", "exited at", "exitedat", "close time", "closed", "exit date", "exit datetime", "uitstap", "uitstaptijd", "eindtijd"],
+            .entryPrice: ["entry_price", "entry price", "entryprice", "open price", "avg entry", "entry", "instapprijs", "prijs in"],
+            .exitPrice: ["exit_price", "exit price", "exitprice", "close price", "avg exit", "exit", "uitstapprijs", "prijs uit"],
+            .stopLoss: ["stop_loss", "stop loss", "stoploss", "sl", "s/l"],
+            .takeProfit: ["take_profit", "take profit", "takeprofit", "tp", "t/p", "target"],
+            .commission: ["commission", "commissions", "commissie", "comm"],
+            .fees: ["fees", "fee", "kosten"],
+            .pnl: ["gross_pnl", "gross p&l", "gross pnl", "gross", "bruto", "profit", "p&l", "pnl", "p/l", "resultaat", "winst"],
+            .netPnL: ["net_pnl", "net p&l", "net pnl", "netpnl", "net profit", "netto", "netto p&l", "netto resultaat"],
+            .account: ["account", "accountnaam", "account name"],
+            .tradeID: ["trade_id", "trade id", "tradeid"],
+            .notes: ["notes", "note", "notities", "notitie", "comment", "opmerking"]
+        ]
+    )
+
     public static let all: [CSVImportPreset] = [
         tradovatePerformance,
         tradovateOrders,
@@ -240,7 +272,8 @@ public enum CSVImportPresets {
         topstepX,
         metaTrader,
         tradingView,
-        tradeJournal
+        tradeJournal,
+        generic
     ]
 
     public static func preset(id: String) -> CSVImportPreset? {
@@ -253,5 +286,12 @@ public enum CSVImportPresets {
         let scored = all.map { ($0, $0.matchScore(for: headers)) }
         guard let best = scored.max(by: { $0.1 < $1.1 }), best.1 >= 0.5 else { return nil }
         return best.0
+    }
+
+    /// `detect`, of anders de generieke preset als die alle verplichte
+    /// velden kan koppelen. `nil` = de gebruiker moet zelf koppelen.
+    public static func detectOrGeneric(headers: [String]) -> CSVImportPreset? {
+        if let detected = detect(headers: headers) { return detected }
+        return generic.mapping(for: headers).validationErrors.isEmpty ? generic : nil
     }
 }

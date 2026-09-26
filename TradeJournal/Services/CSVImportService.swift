@@ -60,7 +60,9 @@ public struct CSVImportService {
     // MARK: - 1. Extractie
 
     public func extract(from table: CSVTable, mapping: CSVColumnMapping, knownSymbols: Set<String>) -> ExtractionResult {
-        let parser = ImportValueParser(dateOrder: mapping.dateOrder, timeZone: mapping.timeZone)
+        // Puntkomma-gescheiden bestanden komen uit een Europese Excel-locale:
+        // daar is een losse komma ("1,250") een decimaalteken.
+        let parser = ImportValueParser(dateOrder: mapping.dateOrder, timeZone: mapping.timeZone, prefersDecimalComma: table.delimiter == ";")
         var issues: [RowIssue] = []
         var skipped = 0
 
@@ -146,6 +148,7 @@ public struct CSVImportService {
                     continue
                 }
                 let reportedPnL = numberValue(.pnl, in: row)
+                let reportedNetPnL = numberValue(.netPnL, in: row)
 
                 let direction: TradeDirection
                 let entryDate: Date
@@ -161,7 +164,10 @@ public struct CSVImportService {
                     entryDate = entry
                     entryPrice = price
                     exitPrice = numberValue(.exitPrice, in: row)
-                    exitDate = exitPrice == nil ? nil : (dateValue(.exitTime, in: row) ?? entry)
+                    // Zonder exit-prijs maar mét netto resultaat is de trade
+                    // gesloten (snelle invoer: alleen het resultaat is bekend).
+                    let isClosed = exitPrice != nil || reportedNetPnL != nil
+                    exitDate = isClosed ? (dateValue(.exitTime, in: row) ?? entry) : nil
 
                     if let parsed = text(.direction, in: row).flatMap(parser.direction) {
                         direction = parsed
@@ -199,7 +205,10 @@ public struct CSVImportService {
                     fees: abs(numberValue(.fees, in: row) ?? 0),
                     reportedPnL: reportedPnL,
                     notes: text(.notes, in: row) ?? "",
-                    sourceRows: [rowNumber]
+                    sourceRows: [rowNumber],
+                    reportedNetPnL: reportedNetPnL,
+                    accountName: text(.account, in: row),
+                    sourceID: text(.tradeID, in: row).flatMap(UUID.init(uuidString:))
                 ))
             }
             trades.sort { $0.entryDate < $1.entryDate }
@@ -209,10 +218,11 @@ public struct CSVImportService {
 
     // MARK: - 2. Voorbeeld + duplicaten
 
-    /// Markeert trades die al in het journal staan (zelfde symbool, richting,
-    /// entry-seconde, aantal en entry-prijs) of eerder in hetzelfde bestand
-    /// voorkomen als duplicaat.
+    /// Markeert trades die al in het journal staan (zelfde trade-id, of zelfde
+    /// symbool, richting, entry-seconde, aantal en entry-prijs) of eerder in
+    /// hetzelfde bestand voorkomen als duplicaat.
     public func preview(_ trades: [ImportedTrade], existingTrades: [Trade], knownSymbols: Set<String>) -> [PreviewItem] {
+        var seenIDs = Set(existingTrades.map(\.id))
         var seen = Set(existingTrades.map { trade in
             ImportedTrade.fingerprint(
                 symbol: trade.symbol,
@@ -226,8 +236,9 @@ public struct CSVImportService {
 
         return trades.enumerated().map { index, trade in
             let fingerprint = trade.fingerprint
-            let isDuplicate = seen.contains(fingerprint)
+            let isDuplicate = seen.contains(fingerprint) || (trade.sourceID.map(seenIDs.contains) ?? false)
             seen.insert(fingerprint)
+            if let sourceID = trade.sourceID { seenIDs.insert(sourceID) }
             return PreviewItem(
                 id: index,
                 trade: trade,
@@ -260,14 +271,26 @@ public struct CSVImportService {
         return (fallbackTickSize, fallbackTickSize)
     }
 
+    /// Het account voor een geïmporteerde trade: het gekozen account wint;
+    /// anders een bestaand account met de naam uit het bestand.
+    public static func account(for trade: ImportedTrade, selected: Account?, accounts: [Account]) -> Account? {
+        if let selected { return selected }
+        guard let name = trade.accountName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
+        return accounts.first { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame }
+    }
+
     /// Slaat de geselecteerde voorbeeldregels op als `Trade`s.
-    /// - Parameter includeDuplicates: `false` slaat duplicaten over.
+    /// - Parameters:
+    ///   - includeDuplicates: `false` slaat duplicaten over.
+    ///   - account: gekozen account; `nil` = koppel op accountnaam uit het bestand.
+    ///   - accounts: bestaande accounts om op naam te koppelen.
     /// - Returns: de aangemaakte trades.
     @discardableResult
     public func commit(
         _ items: [PreviewItem],
         includeDuplicates: Bool,
         account: Account?,
+        accounts: [Account] = [],
         instruments: [Instrument],
         in context: ModelContext
     ) -> [Trade] {
@@ -275,6 +298,8 @@ public struct CSVImportService {
         for instrument in instruments {
             instrumentsBySymbol[instrument.symbol.uppercased()] = instrument
         }
+        // Trade-id's die al bestaan niet hergebruiken (bij "duplicaten ook importeren").
+        var usedIDs = Set(((try? context.fetch(FetchDescriptor<Trade>())) ?? []).map(\.id))
 
         var created: [Trade] = []
         for item in items where includeDuplicates || !item.isDuplicate {
@@ -282,8 +307,13 @@ public struct CSVImportService {
             let instrument = instrumentsBySymbol[imported.symbol.uppercased()]
             let spec = Self.tickSpec(for: imported, instrument: instrument)
             let hasFills = !imported.fills.isEmpty
+            let account = Self.account(for: imported, selected: account, accounts: accounts)
+            var id = UUID()
+            if let sourceID = imported.sourceID, !usedIDs.contains(sourceID) { id = sourceID }
+            usedIDs.insert(id)
 
             let trade = Trade(
+                id: id,
                 symbol: imported.symbol,
                 direction: imported.direction,
                 entryDate: imported.entryDate,
@@ -319,6 +349,16 @@ public struct CSVImportService {
                     executions.append(execution)
                 }
                 trade.executions = executions
+            }
+
+            // Netto resultaat uit het bestand bewaren als het niet uit de
+            // prijzen volgt (snelle trade zonder prijzen, of broker-resultaat
+            // dat afwijkt) — zo blijft een export → import exact gelijk.
+            if !hasFills, let net = imported.reportedNetPnL {
+                let computed = statsService.metrics(for: trade)
+                if computed.outcome == .open || abs(computed.netPnL - net) > 0.005 {
+                    trade.manualNetPnL = net
+                }
             }
 
             statsService.recomputeSession(for: trade)

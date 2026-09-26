@@ -57,7 +57,7 @@ public final class CSVImportViewModel {
             table = parsed
             self.fileName = fileName
             errorMessage = nil
-            if let detected = CSVImportPresets.detect(headers: parsed.headers) {
+            if let detected = CSVImportPresets.detectOrGeneric(headers: parsed.headers) {
                 applyPreset(id: detected.id)
             } else {
                 selectedPresetID = nil
@@ -144,11 +144,12 @@ public final class CSVImportViewModel {
     // MARK: - Stap 4: importeren
 
     @discardableResult
-    public func importTrades(instruments: [Instrument], in context: ModelContext) -> Int {
+    public func importTrades(instruments: [Instrument], accounts: [Account] = [], in context: ModelContext) -> Int {
         let created = service.commit(
             previewItems,
             includeDuplicates: includeDuplicates,
             account: account,
+            accounts: accounts,
             instruments: instruments,
             in: context
         )
