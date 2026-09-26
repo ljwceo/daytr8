@@ -233,6 +233,8 @@ private struct CSVImportPreviewView: View {
 
     @Bindable var viewModel: CSVImportViewModel
     let instruments: [Instrument]
+    /// Om per trade op accountnaam te koppelen (accountkolom in het bestand).
+    @Query(sort: \Account.createdAt) private var accounts: [Account]
     let onFinished: () -> Void
 
     var body: some View {
