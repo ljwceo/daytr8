@@ -80,6 +80,9 @@ jobs:
     runs-on: macos-15
     needs: test
     timeout-minutes: 30
+    # Nodig om de IPA bij de "latest"-release (en tag-releases) te zetten.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -138,6 +141,24 @@ jobs:
           path: TradeJournal.ipa
           if-no-files-found: error
           retention-days: 30
+
+      # Artifacts worden door GitHub altijd nog eens gezipt; die zip opent de
+      # Bestanden-app op iPhone niet ("Bad message"). Daarom staat de IPA van
+      # elke build op main ook los op een vaste link:
+      # https://github.com/<owner>/<repo>/releases/download/latest/TradeJournal.ipa
+      - name: Publish IPA on the "latest" pre-release (main only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create latest TradeJournal.ipa \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Laatste build (main)" \
+            --notes "Unsigned IPA van commit ${GITHUB_SHA::7}. Download TradeJournal.ipa hieronder en sign/installeer hem via Signulous."
 
       - name: Attach IPA to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
