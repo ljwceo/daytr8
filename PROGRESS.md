@@ -1199,8 +1199,10 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
 - `BackupViewModel.prepareRestore` kopieert zip, map of json gecoördineerd
   (`NSFileCoordinator`), zodat iCloud-bestanden eerst gedownload worden; bij een
   losse `backup.json` wordt de `images/`-map ernaast meegenomen als dat mag.
-- `BackupView`: de bestandskiezer accepteert `.zip`, mappen en `.json`; de
-  uitleg zegt dat de map de voorkeur heeft (dan komen screenshots mee).
+- `BackupView`: twee knoppen — "Herstel uit backupbestand…" (`.zip`, `.json`,
+  `.data`) en "Herstel uit uitgepakte backupmap…" (`.folder`). Eerst stonden
+  ze in één kiezer, maar met `.folder` in de lijst laat de iOS-documentkiezer
+  alleen mappen kiezen: `backup.json` bleef grijs (gezien op toestel).
 - Tests (`BackupServiceTests`): restore uit uitgepakte map incl. screenshots,
   map daarboven, losse json (screenshots overgeslagen), zip zonder extensie,
   lege map → "backup.json ontbreekt".
