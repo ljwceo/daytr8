@@ -1203,6 +1203,15 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
   `.data`) en "Herstel uit uitgepakte backupmap…" (`.folder`). Eerst stonden
   ze in één kiezer, maar met `.folder` in de lijst laat de iOS-documentkiezer
   alleen mappen kiezen: `backup.json` bleef grijs (gezien op toestel).
+- Daarna gebeurde er "niks" na het kiezen: de bevestigingsdialoog werd direct
+  vanuit de afhandeling van de bestandskiezer geopend, en SwiftUI negeert een
+  nieuwe presentatie zolang de kiezer nog sluit; foutmeldingen stonden onderaan
+  buiten beeld. Nu verschijnt de gevonden backup als kaart bovenaan
+  (samenvatting + "Herstel deze backup…", dat de bevestiging opent) en staan
+  meldingen bovenaan.
+- CI publiceert de IPA van elke build op `main` los op de pre-release `latest`
+  (vaste link `releases/download/latest/TradeJournal.ipa`); het artifact is een
+  extra zip die de Bestanden-app niet opent ("Bad message").
 - Tests (`BackupServiceTests`): restore uit uitgepakte map incl. screenshots,
   map daarboven, losse json (screenshots overgeslagen), zip zonder extensie,
   lege map → "backup.json ontbreekt".

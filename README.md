@@ -64,10 +64,15 @@ Je hoeft geen Mac te hebben. Alles gebeurt via GitHub en de Signulous-app op je 
 2. Wacht tot de workflow **Build unsigned IPA** groen is. De job draait op
    `macos-15`, installeert XcodeGen, genereert het project, bouwt Release voor
    `iphoneos` zonder code signing en zipt het resultaat als `TradeJournal.ipa`.
-3. Open de succesvolle run en download het artifact
-   **`TradeJournal-unsigned-ipa`** onderaan de pagina. Pak de zip uit — daarin zit
-   `TradeJournal.ipa`. (Bij een tag `v*` is de `.ipa` ook direct te vinden onder
-   **Releases**.)
+3. Download de `.ipa` van de laatste build op `main` direct — op je iPhone of
+   computer — via de vaste link
+   `https://github.com/<owner>/<repo>/releases/download/latest/TradeJournal.ipa`
+   (of **Releases → Laatste build (main)**). Bij een tag `v*` staat de `.ipa` ook
+   bij die release.
+
+   Het artifact **`TradeJournal-unsigned-ipa`** onderaan een run bestaat ook nog,
+   maar GitHub zet daar een extra zip omheen die de Bestanden-app op iPhone niet
+   kan openen ("Bad message"). Gebruik dat alleen op een computer.
 
 ### 2. Sign en installeer via Signulous
 

@@ -125,8 +125,8 @@ public final class BackupViewModel {
 
     // MARK: - Restore
 
-    /// Leest een gekozen backup in (nog zonder iets te wissen) en vraagt om
-    /// bevestiging.
+    /// Leest een gekozen backup in (nog zonder iets te wissen). De view toont
+    /// hem daarna met een knop die om bevestiging vraagt.
     ///
     /// `url` mag de `.zip` zijn, maar ook de map die de Bestanden-app ervan
     /// maakt als je op de zip tikt, of alleen `backup.json` daaruit. Alles
@@ -152,8 +152,10 @@ public final class BackupViewModel {
                 try? Self.coordinatedCopy(from: images, to: workDirectory.appendingPathComponent("images", isDirectory: true))
             }
 
+            // De view toont de gevonden backup; bevestigen gaat via een knop
+            // (een dialoog die hier direct opent, slikt SwiftUI in terwijl de
+            // bestandskiezer nog sluit).
             self.pendingRestore = try self.backupService.loadBackup(at: local)
-            self.isConfirmingRestore = true
         }
     }
 
