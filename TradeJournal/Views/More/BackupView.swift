@@ -37,12 +37,8 @@ struct BackupView: View {
 
     var body: some View {
         List {
-            statusSection
-            backupSection
-            restoreSection
-            autoBackupSection
-            exportSection
-
+            // Meldingen bovenaan, zodat ze na het kiezen van een bestand direct
+            // in beeld zijn (onderaan vielen ze buiten beeld).
             if let message = viewModel.errorMessage {
                 Section {
                     Label(message, systemImage: "xmark.octagon.fill")
@@ -58,6 +54,14 @@ struct BackupView: View {
                 }
                 .listRowBackground(Theme.card)
             }
+
+            pendingRestoreSection
+            statusSection
+            backupSection
+            restoreSection
+            autoBackupSection
+            exportSection
+
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
@@ -149,6 +153,35 @@ struct BackupView: View {
             Text("Bevat alle trades, accounts, playbooks, confluences, journals en screenshots. Kies \"Bewaar in Bestanden\" of deel het bestand, bijvoorbeeld naar je computer.")
         }
         .listRowBackground(Theme.card)
+    }
+
+    /// De gekozen, al ingelezen backup — bovenaan, zodat hij na het sluiten van
+    /// de bestandskiezer direct in beeld is. Bewust geen automatisch dialoog-
+    /// venster: dat opent SwiftUI niet zolang de bestandskiezer nog sluit
+    /// ("er gebeurt niks" na het kiezen).
+    @ViewBuilder
+    private var pendingRestoreSection: some View {
+        if let summary = viewModel.pendingRestore?.summary {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Backup gevonden", systemImage: "doc.zipper")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(summaryText(summary))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Button(role: .destructive) {
+                    viewModel.isConfirmingRestore = true
+                } label: {
+                    Label("Herstel deze backup…", systemImage: "arrow.counterclockwise.circle.fill")
+                }
+                Button("Annuleren") {
+                    viewModel.cancelRestore()
+                }
+            }
+            .listRowBackground(Theme.card)
+        }
     }
 
     private var restoreSection: some View {
@@ -254,15 +287,15 @@ struct BackupView: View {
         .listRowBackground(Theme.card)
     }
 
+    private func summaryText(_ summary: BackupService.Summary) -> String {
+        let date = summary.exportedAt.formatted(date: .abbreviated, time: .shortened)
+        return "Backup van \(date): \(summary.tradeCount) trades, \(summary.accountCount) accounts, "
+            + "\(summary.playbookCount) playbooks, \(summary.journalCount) journals, \(summary.screenshotCount) screenshots."
+    }
+
     private var restoreMessage: String {
         guard let summary = viewModel.pendingRestore?.summary else { return "" }
-        let date = summary.exportedAt.formatted(date: .abbreviated, time: .shortened)
-        return """
-        Backup van \(date): \(summary.tradeCount) trades, \(summary.accountCount) accounts, \
-        \(summary.playbookCount) playbooks, \(summary.journalCount) journals, \(summary.screenshotCount) screenshots.
-
-        Alle huidige data wordt gewist en vervangen. Dit kan niet ongedaan gemaakt worden.
-        """
+        return summaryText(summary) + "\n\nAlle huidige data wordt gewist en vervangen. Dit kan niet ongedaan gemaakt worden."
     }
 }
 
