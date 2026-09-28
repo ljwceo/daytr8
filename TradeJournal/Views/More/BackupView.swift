@@ -16,15 +16,21 @@ struct BackupView: View {
     /// Eén `fileImporter` voor zowel backup-bestanden als mappen: meerdere
     /// `fileImporter`s op dezelfde view werken in SwiftUI niet betrouwbaar.
     private enum ImporterKind {
+        /// Backupbestand: de .zip of een losse backup.json.
         case restore
+        /// Uitgepakte backupmap (backup.json + images/).
+        case restoreFolder
+        /// Map voor automatische backups.
         case folder
 
         var contentTypes: [UTType] {
             switch self {
-            // Zip, óf wat de Bestanden-app ervan maakt na uitpakken: de map
-            // (backup.json + images/) of alleen backup.json.
-            case .restore: return [.zip, .folder, .json]
-            case .folder: return [.folder]
+            // Géén `.folder` hier: staat die in de lijst, dan kiest de iOS-
+            // documentkiezer alleen nog mappen en zijn bestanden grijs.
+            // `.data` als vangnet (bijv. een json die iCloud anders typeert);
+            // BackupArchiveOpener herkent de inhoud zelf.
+            case .restore: return [.zip, .json, .data]
+            case .restoreFolder, .folder: return [.folder]
             }
         }
     }
@@ -70,7 +76,7 @@ struct BackupView: View {
             switch result {
             case .success(let url):
                 switch importerKind {
-                case .restore: viewModel.prepareRestore(from: url)
+                case .restore, .restoreFolder: viewModel.prepareRestore(from: url)
                 case .folder: viewModel.setAutoBackupFolder(url, context: modelContext)
                 }
             case .failure(let error):
@@ -151,12 +157,18 @@ struct BackupView: View {
                 importerKind = .restore
                 isImporterPresented = true
             } label: {
-                Label("Herstel uit backup…", systemImage: "arrow.counterclockwise")
+                Label("Herstel uit backupbestand…", systemImage: "arrow.counterclockwise")
+            }
+            Button(role: .destructive) {
+                importerKind = .restoreFolder
+                isImporterPresented = true
+            } label: {
+                Label("Herstel uit uitgepakte backupmap…", systemImage: "folder")
             }
         } header: {
             Text("Herstellen")
         } footer: {
-            Text("Kies het .zip-bestand, of — als Bestanden de zip al heeft uitgepakt — de backupmap of backup.json. Kies bij voorkeur de map, dan komen de screenshots ook mee. Een restore vervangt álle huidige data door de inhoud van de backup; je ziet eerst een samenvatting ter bevestiging.")
+            Text("Backupbestand: kies de .zip of, als Bestanden de zip al heeft uitgepakt, de backup.json daaruit. Uitgepakte backupmap: kies de map met backup.json en images — dan komen ook de screenshots mee. Een restore vervangt álle huidige data door de inhoud van de backup; je ziet eerst een samenvatting ter bevestiging.")
         }
         .listRowBackground(Theme.card)
     }
