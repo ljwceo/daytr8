@@ -13,6 +13,11 @@ struct BackupView: View {
     /// Toont de iOS-documentkiezer via UIKit (i.p.v. `.fileImporter`, dat op
     /// het toestel niet betrouwbaar terugriep).
     @State private var picker = DocumentPickerPresenter()
+    /// Backup die uit de importmap gekozen is; na een geslaagde restore
+    /// verhuist hij naar `Import/Hersteld/`.
+    @State private var inboxSelection: URL?
+    /// Wijzigt na een restore, zodat de importmap-sectie opnieuw scant.
+    @State private var inboxRefreshID = UUID()
 
     var body: some View {
         List {
@@ -38,6 +43,13 @@ struct BackupView: View {
             statusSection
             backupSection
             restoreSection
+            // Importmap "Op mijn iPhone › Daytr8 › Import" (werkt zonder kiezer).
+            ImportInboxSection { url in
+                inboxSelection = url
+                viewModel.diagnostics.record("Importmap: backup gekozen", detail: url.lastPathComponent)
+                Task { await viewModel.prepareRestore(from: url) }
+            }
+            .id(inboxRefreshID)
             autoBackupSection
             exportSection
             diagnosticsSection
@@ -70,6 +82,7 @@ struct BackupView: View {
         ) {
             Button("Wis huidige data en herstel", role: .destructive) {
                 viewModel.confirmRestore(into: modelContext)
+                markInboxBackupRestoredIfNeeded()
             }
             Button("Annuleren", role: .cancel) {
                 viewModel.cancelRestore()
@@ -128,6 +141,17 @@ struct BackupView: View {
     /// venster: dat opent SwiftUI niet zolang de bestandskiezer nog sluit
     /// ("er gebeurt niks" na het kiezen).
     @ViewBuilder
+    /// Na een geslaagde restore uit de importmap: backup naar `Import/Hersteld/`.
+    private func markInboxBackupRestoredIfNeeded() {
+        guard let url = inboxSelection else { return }
+        inboxSelection = nil
+        guard viewModel.errorMessage == nil, viewModel.pendingRestore == nil else { return }
+        if let moved = try? ImportInboxService().markRestored(url: url) {
+            viewModel.diagnostics.record("Importmap: backup verplaatst naar Hersteld", detail: moved.lastPathComponent)
+        }
+        inboxRefreshID = UUID()
+    }
+
     private var pendingRestoreSection: some View {
         if let summary = viewModel.pendingRestore?.summary {
             Section {

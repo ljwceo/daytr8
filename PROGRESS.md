@@ -1264,11 +1264,38 @@ Klacht op het toestel: "ik tik op de zip / backup.json en er gebeurt niks".
 
 ### Openen via Bestanden/Deel (pakket B)
 
-_Volgt._
+- Daytr8 staat als *Alternate*-handler voor `.zip` en `.json` in
+  `CFBundleDocumentTypes` (`project.yml` + `Info.plist`): lang indrukken →
+  Deel → Daytr8 (of "Open in" vanuit Mail) stuurt een backup direct naar de
+  app, zonder de bestandskiezer.
+- `LSSupportsOpeningDocumentsInPlace` = false: iOS levert een kopie in
+  `Documents/Inbox`; `IncomingFileRouter` ruimt die na afloop op.
+  `UIFileSharingEnabled` = true: "Op mijn iPhone › Daytr8" zichtbaar in
+  Bestanden (voor de importmap).
+- `Services/IncomingFileRouter.swift` vangt `.onOpenURL` op; `RootTabView`
+  toont `Views/More/IncomingBackupView.swift` als sheet, pas na ontgrendelen
+  en niet tegelijk met de rondleiding. Die leest in via `BackupViewModel`,
+  toont de samenvatting en herstelt na bevestiging.
+- CI zet `CURRENT_PROJECT_VERSION` op het run-nummer: elke IPA heeft een eigen
+  buildnummer (zichtbaar onder Backup & herstel → footer).
+- Tests: `IncomingFileRouterTests`, `InfoPlistTests`.
+- Beperking: tikken op een `.zip` in Bestanden pakt hem nog steeds uit; gebruik
+  lang indrukken → Deel → Daytr8.
 
 ### Importmap (pakket C)
 
-_Volgt._
+- Route zonder kiezer: kopieer in Bestanden een backup (.zip, backup.json of
+  de uitgepakte map) naar "Op mijn iPhone › Daytr8 › Import".
+- `Services/ImportInboxService.swift`: `ensureFolder()` maakt
+  `Documents/Import/` + `LEESMIJ.txt` (zodat de map zichtbaar is); `scan()`
+  vindt backups in `Import/`, `Documents/` en `Documents/Inbox/` (nieuwste
+  eerst; `Hersteld/`, verborgen en `.icloud` overgeslagen); `markRestored`
+  verplaatst naar `Import/Hersteld/` met unieke naam.
+- `Views/More/ImportInboxSection.swift`: sectie "Backups in de Daytr8-map" in
+  Backup & herstel (ververst bij openen, terugkeer naar de app en "Vernieuw");
+  tikken → `prepareRestore`; na een geslaagde restore verhuist `BackupView`
+  de backup naar `Hersteld/`.
+- Tests: `ImportInboxServiceTests`.
 
 ## Volgende fase
 
