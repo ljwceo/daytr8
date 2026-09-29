@@ -136,11 +136,6 @@ struct BackupView: View {
         .listRowBackground(Theme.card)
     }
 
-    /// De gekozen, al ingelezen backup — bovenaan, zodat hij na het sluiten van
-    /// de bestandskiezer direct in beeld is. Bewust geen automatisch dialoog-
-    /// venster: dat opent SwiftUI niet zolang de bestandskiezer nog sluit
-    /// ("er gebeurt niks" na het kiezen).
-    @ViewBuilder
     /// Na een geslaagde restore uit de importmap: backup naar `Import/Hersteld/`.
     private func markInboxBackupRestoredIfNeeded() {
         guard let url = inboxSelection else { return }
@@ -152,6 +147,11 @@ struct BackupView: View {
         inboxRefreshID = UUID()
     }
 
+    /// De gekozen, al ingelezen backup — bovenaan, zodat hij na het sluiten van
+    /// de bestandskiezer direct in beeld is. Bewust geen automatisch dialoog-
+    /// venster: dat opent SwiftUI niet zolang de bestandskiezer nog sluit
+    /// ("er gebeurt niks" na het kiezen).
+    @ViewBuilder
     private var pendingRestoreSection: some View {
         if let summary = viewModel.pendingRestore?.summary {
             Section {
