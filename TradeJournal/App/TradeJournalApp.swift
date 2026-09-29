@@ -29,6 +29,9 @@ struct TradeJournalApp: App {
     /// Welkomstmelding, rondleiding en tabselectie.
     @State private var onboarding = OnboardingViewModel()
 
+    /// Backups die via de Bestanden-app of het deelmenu binnenkomen.
+    @State private var incomingFiles = IncomingFileRouter()
+
     /// Laadscherm met het woordmerk tot de start-taken klaar zijn.
     @State private var isSplashVisible = true
 
@@ -48,6 +51,12 @@ struct TradeJournalApp: App {
                 }
                 .environment(appLock)
                 .environment(onboarding)
+                .environment(incomingFiles)
+                // "Deel → Daytr8" / "Open in" vanuit Bestanden: iOS levert een
+                // kopie in Documents/Inbox; RootTabView toont hem als sheet.
+                .onOpenURL { url in
+                    incomingFiles.receive(url)
+                }
                 // Color scheme volgt het gekozen thema en staat op `RootTabView`.
                 .tint(Theme.accent)
                 .task {
