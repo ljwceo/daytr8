@@ -1216,6 +1216,60 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
   map daarboven, losse json (screenshots overgeslagen), zip zonder extensie,
   lege map → "backup.json ontbreekt".
 
+## Herstellen: drie ingangen + importlogboek
+
+Klacht op het toestel: "ik tik op de zip / backup.json en er gebeurt niks".
+
+### Kiezer + asynchroon inlezen + logboek (pakket A)
+
+- Oorzaak (meest waarschijnlijk): de callback van `.fileImporter` deed het
+  hele inlezen synchroon op de main thread (`NSFileCoordinator` + kopie +
+  uitpakken). Bij een iCloud-bestand dat nog niet lokaal stond blokkeerde dat
+  tot de download klaar was — de kiezer kon niet sluiten en er was geen
+  voortgang te zien. Daarnaast was het één `.fileImporter` met wisselende
+  `allowedContentTypes` op een view met ook `.sheet` en `.confirmationDialog`,
+  wat in iOS 17/18 niet betrouwbaar terugroept. Er was ook geen manier om te
+  zien óf de kiezer terugriep.
+- `Views/Components/DocumentPickerPresenter.swift` (nieuw): toont
+  `UIDocumentPickerViewController` via UIKit vanaf de bovenste view controller
+  van het key window, met een sterk vastgehouden `DocumentPickerCoordinator`
+  die de completion precies één keer aanroept (`nil` = geannuleerd).
+  Backupbestand: `[.zip, .json, .data]` met `asCopy: true` (iOS downloadt en
+  kopieert vóór de callback); mappen (uitgepakte backup, map voor automatische
+  backup): `[.folder]` zonder kopie (bookmark). Weigert als er al een kiezer
+  open is of een ander scherm nog opent/sluit (melding bovenaan).
+- `BackupViewModel` is nu `@MainActor`. `prepareRestore(from:isTemporaryCopy:) async`:
+  direct "Bestand ontvangen: … – inlezen…" + spinner; iCloud-download
+  aanvragen, (gecoördineerd) kopiëren en `loadBackup` in `Task.detached`
+  (`BackupRestorePreparer`); fout mét bestandsnaam. Tijdelijke werkmap wordt
+  opgeruimd na fout, annuleren of herstellen. Annuleren in de kiezer →
+  "Geen bestand gekozen.".
+- `Services/ImportDiagnosticsLog.swift` (nieuw): ringbuffer van 300 regels in
+  Application Support (`Diagnostics/import-log.json`), met elke stap: knop,
+  kiezer getoond/callback/geannuleerd, bestandsinfo (type, grootte, iCloud,
+  downloadstatus), security scope, kopie, archieftype, samenvatting, fouten
+  (domein + code). `exportText()` met appversie, build en iOS-versie.
+- `Views/More/ImportLogView.swift` (nieuw): lijst + Kopieer / Deel / Wis;
+  bereikbaar via "Importlogboek" onderaan Backup & herstel, met in de footer
+  "Versie X (build N)".
+- `BackupView`: `.fileImporter` en `ImporterKind` weg; knoppen via de
+  presenter; kaart "Backup gevonden" en meldingen bovenaan ongewijzigd.
+- Tests: `BackupRestoreAsyncTests` (zip, uitgepakte map, losse json, kopie
+  van de kiezer + herstellen, ongeldig/ontbrekend bestand, annuleren,
+  delegate exact één callback, kiezermodi) en `ImportDiagnosticsLogTests`
+  (ringbuffer, persistentie, export-kop, afkappen, foutcodes).
+- Op het toestel testen: zip in iCloud (ook nog niet gedownload), zip op
+  "Op mijn iPhone", backup.json uit een uitgepakte map, knop uitgepakte map,
+  annuleren; bij problemen het importlogboek delen.
+
+### Openen via Bestanden/Deel (pakket B)
+
+_Volgt._
+
+### Importmap (pakket C)
+
+_Volgt._
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
