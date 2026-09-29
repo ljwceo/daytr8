@@ -14,6 +14,7 @@ struct DashboardView: View {
     @State private var liveQuote = LiveQuoteViewModel()
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(RewardsViewModel.self) private var rewards
     @AppStorage(LiveQuoteSettings.Keys.isEnabled) private var liveQuoteEnabled = true
     @AppStorage(LiveQuoteSettings.Keys.symbolOverride) private var liveQuoteSymbolOverride = ""
 
@@ -93,6 +94,20 @@ struct DashboardView: View {
                 // Woordmerk klein boven de grote titel.
                 ToolbarItem(placement: .topBarLeading) {
                     Daytr8LogoView(variant: .wordmark, size: 20)
+                }
+                // Medaille-overzicht.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        rewards.openOverview()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rosette")
+                            Text("\(rewards.unlockedCount)")
+                                .font(.subheadline.weight(.semibold))
+                                .monospacedDigit()
+                        }
+                    }
+                    .accessibilityLabel(AppStrings.Rewards.openMedalsAccessibility)
                 }
             }
             .toolbarBackground(Theme.background, for: .navigationBar)
@@ -228,6 +243,7 @@ struct DashboardView: View {
 
 #Preview {
     DashboardView()
+        .environment(RewardsViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }

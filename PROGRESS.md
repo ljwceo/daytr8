@@ -1297,6 +1297,90 @@ Klacht op het toestel: "ik tik op de zip / backup.json en er gebeurt niks".
   de backup naar `Hersteld/`.
 - Tests: `ImportInboxServiceTests`.
 
+## Rewards, eigen thema's en compactere instellingen
+
+Vier verbeteringen in één pakket (op verzoek). "CSS-variabelen" en
+`prefers-reduced-motion` uit het verzoek zijn vertaald naar de iOS-equivalenten:
+de `Theme`-tokens (alles, ook grafieken, medailles en animaties, leest daaruit)
+en de toegankelijkheidsinstelling *Verminder beweging*.
+
+### 1. Animatie na het opslaan van een trade
+
+- `Views/Rewards/TradeSavedCelebrationView.swift` (nieuw): oplichtend
+  succesvinkje (uitdijende ring + gloed), kaartje met P&L dat daarna naar de
+  Rapporten-tab "wegvliegt"; totaal ≤ 1,5 s. Alleen transforms/opacity; tik =
+  overslaan. *Verminder beweging*: alleen een korte fade.
+- Hot streak vanaf 3 winsten op rij: "🔥 N wins op rij!" met vlammen/vonken
+  (`HotStreakParticlesView`, één `Canvas` per frame) en gloed; aantal,
+  grootte, snelheid en kleur (warning → loss) groeien tot 15 op rij.
+- Na de animatie gaat de app naar Rapporten (uit te zetten). Alleen bij een
+  nieuwe trade; bewerken toont geen animatie.
+- `TradeFormView` roept na `save` `RewardsViewModel.tradeSaved` aan.
+
+### 2. Medailles
+
+- `Models/Medal.swift` (`MedalTier`, `MedalCategory`, `MedalDefinition`,
+  `MedalEvent`) en `Models/MedalCatalog.swift`: 85 medailles. Niveaus Koper 5
+  · Brons 20 · Zilver 50 · Goud 100 · Platina 250 · Saffier 500 · Robijn 750 ·
+  Smaragd 1000 · Diamant 2500 · Obsidiaan 5000 voor trades, winnende trades,
+  journaling (notities/screenshots) en risk management (stop-loss/gepland
+  risico); totale winst ×100 ($500 … $500.000); win-streak 3/5/7/10/15/20/25/
+  30/40/50; handelsdagen op rij 3 … 250 (weekenden zonder trades breken niet);
+  win rate 40% over 20 trades … 75% over 1000. Speciaal: Eerste trade en
+  (verborgen) Comeback, Nachtbraker, Perfecte week, Home run (≥ 5R).
+- `Services/MedalService.swift`: puur; loopt de trades chronologisch door en
+  bewaart per medaille het moment van behalen (dus ook achteraf de juiste
+  datum). Eenmaal behaald blijft behaald.
+- `Services/MedalStore.swift`: behaalde medailles + datum als JSON in
+  `UserDefaults`, in de backup (`backedUpKeys`) en herladen na een restore.
+- `ViewModels/RewardsViewModel.swift` (environment): sync bij app-start en
+  terugkeer naar de voorgrond; eerste keer stil met één samenvatting; daarna
+  toasts één voor één (meer dan 4 tegelijk → één samenvatting); toasts wachten
+  tot de animatie klaar is.
+- `Views/Rewards/MedalToastView.swift`, `MedalsView.swift` (overzicht met
+  filter, voortgang, datum, verborgen medailles, detail-sheet),
+  `MedalIconView.swift` (materiaalverloop per niveau, gloed vanaf Platina).
+  Openen via de medailleknop op het dashboard, een toast of Meer.
+
+### 3. Eigen thema's met kleurenwiel
+
+- `Models/CustomTheme.swift`: zes kleuren (accent, achtergrond, kaart, tekst,
+  winst, verlies); `Utilities/ThemePaletteGenerator.swift` leidt de overige
+  tokens af (met WCAG-correctie), geeft contrastwaarschuwingen, corrigeert
+  automatisch en genereert een donker/licht palet uit één accent.
+- `Utilities/ColorMath.swift`: `HSBColor`, HEX-validatie, mengen, contrast.
+- `ThemeStore`: eigen thema's als JSON (`theme.customThemes`, in de backup);
+  opslaan/bewerken (actief thema wijzigt live), verwijderen, terug naar
+  standaard. `ThemePalette.Group.custom`.
+- `Views/More/ThemeEditorView.swift` + `ViewModels/ThemeEditorViewModel.swift`
+  (sheet): naam, live preview (incl. mini-grafiek en medaille),
+  `Views/Components/ColorWheelView.swift`, helderheid/verzadiging, HEX-veld.
+- `ThemePickerView`/`ThemeSettingsView`: groep "Eigen thema's" met
+  "Nieuw thema"-staal en een compacte beheerlijst.
+
+### 4. Compactere instellingen
+
+- `MoreView`: inklapbare secties (Account & beveiliging, Trading, Journal,
+  Weergave & thema, Meldingen & rewards, Data, Debug — Debug standaard dicht;
+  keuze onthouden), overzicht in één rij, status inline (aan/uit, aantallen,
+  themanaam), compacte rijhoogte/sectie-afstand, inline toggles met ⓘ-uitleg
+  (`Views/Components/InfoTipButton.swift`).
+- Nieuwe instellingen (`Services/RewardSettings.swift`): Animaties,
+  Medaillemeldingen, Na opslaan naar Rapporten — standaard aan, in de backup.
+
+### Tests
+
+- `CustomThemeTests` (HSB/HEX, contrast, generator ≥ WCAG AA voor
+  uiteenlopende accenten, opslag/verwijderen/reload, editor),
+  `MedalServiceTests` (catalogus, drempels + datum, streaks, dagen op rij,
+  win rate, speciale medailles, opslag), `RewardsViewModelTests` (stille
+  eerste sync, animatie → toast, hot streak, instellingen, samenvatting).
+
+### Openstaand
+
+- Op het toestel controleren: vloeiendheid van de hot streak bij 15+ op rij
+  op oudere iPhones, en de popover-uitleg (ⓘ) op iPad.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen

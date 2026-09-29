@@ -70,6 +70,36 @@ enum Theme {
     /// Standaard binnenmarge voor kaarten.
     static let cardPadding: CGFloat = 16
 
+    // MARK: - Rewards
+
+    /// Materiaalverloop (licht → donker) van een medaille. Vast per materiaal
+    /// (koper, goud, smaragd, …) zodat een medaille in elk thema herkenbaar blijft.
+    static func medalGradient(_ tier: MedalTier) -> [Color] {
+        [tier.material.light.color, tier.material.dark.color]
+    }
+
+    /// Icoon-/tekstkleur óp een medaille van dit materiaal.
+    static func onMedal(_ tier: MedalTier) -> Color {
+        tier.material.light.mixed(with: tier.material.dark, amount: 0.5).readableForeground.color
+    }
+
+    /// Gloed rond hoge medaille-niveaus.
+    static func medalGlow(_ tier: MedalTier) -> Color {
+        tier.material.light.color.opacity(tier.hasGlow ? 0.55 : 0)
+    }
+
+    /// Kleuren van de hot streak-animatie: van warm (3 op rij) naar heet.
+    static func hotStreakColors(intensity: Double) -> [Color] {
+        let hot = palette.warning.mixed(with: palette.loss, amount: min(max(intensity, 0), 1))
+        return [palette.warning.color, hot.color]
+    }
+
+    // MARK: - Kleurenwiel
+
+    /// Vaste kleuren van het kleurenwiel (thema-onafhankelijk: het wiel toont echte kleuren).
+    static let colorWheelWhite = Color(white: 1)
+    static let colorWheelBlack = Color(white: 0)
+
     /// Geeft groen bij winst, rood bij verlies, grijs bij nul.
     static func color(forPnL value: Double) -> Color {
         if value > 0 { return profit }

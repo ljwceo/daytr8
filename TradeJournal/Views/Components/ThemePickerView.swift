@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Kleurstalen per groep (Pastel / Effen) met een live preview erboven.
-/// Een tik kiest het thema meteen voor de hele app (en bewaart de keuze).
-/// Gebruikt in Meer → Thema en in de onboarding.
+/// Kleurstalen per groep (Pastel / Effen / Eigen thema's) met een live
+/// preview erboven. Een tik kiest het thema meteen voor de hele app (en
+/// bewaart de keuze). Gebruikt in Meer → Thema en in de onboarding.
 struct ThemePickerView: View {
 
     var store: ThemeStore = .shared
+    /// Gezet in Meer → Thema: toont een "Nieuw thema"-staal die de editor opent.
+    var onCreateCustom: (() -> Void)? = nil
 
     private let columns = [GridItem(.adaptive(minimum: 72), spacing: 12)]
 
@@ -13,7 +15,7 @@ struct ThemePickerView: View {
         VStack(alignment: .leading, spacing: 20) {
             ThemePreviewCardView(palette: store.palette)
 
-            ForEach(ThemePalette.Group.allCases) { group in
+            ForEach(ThemePalette.Group.builtIn) { group in
                 VStack(alignment: .leading, spacing: 10) {
                     Text(group.displayName)
                         .font(.caption.weight(.semibold))
@@ -25,7 +27,47 @@ struct ThemePickerView: View {
                     }
                 }
             }
+
+            if !store.customThemes.isEmpty || onCreateCustom != nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(ThemePalette.Group.custom.displayName)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(store.customPalettes) { palette in
+                            swatch(palette)
+                        }
+                        if let onCreateCustom {
+                            newThemeTile(action: onCreateCustom)
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private func newThemeTile(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background(Theme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous)
+                            .strokeBorder(Theme.accent.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    )
+                Text(AppStrings.Themes.newTheme)
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func swatch(_ palette: ThemePalette) -> some View {
@@ -86,6 +128,9 @@ struct ThemePickerView: View {
 struct ThemePreviewCardView: View {
 
     let palette: ThemePalette
+    /// Ook een mini-grafiek en medaille tonen (thema-editor), zodat zichtbaar
+    /// is dat grafieken en rewards de themakleuren volgen.
+    var showsExtras: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -107,6 +152,10 @@ struct ThemePreviewCardView: View {
             previewRow(symbol: "NQ", side: "Long", label: AppStrings.Themes.previewWin, amount: "+$620", color: palette.profit)
             previewRow(symbol: "ES", side: "Short", label: AppStrings.Themes.previewLoss, amount: "-$138", color: palette.loss)
 
+            if showsExtras {
+                extrasRow
+            }
+
             Text(AppStrings.Themes.previewButton)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.onAccent.color)
@@ -123,6 +172,54 @@ struct ThemePreviewCardView: View {
                 .stroke(palette.textPrimary.color.opacity(palette.borderOpacity), lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
+    }
+
+    /// Mini-staafgrafiek in winst/verlies-kleuren plus een medaille-chip.
+    private var extrasRow: some View {
+        let bars: [Double] = [0.5, -0.3, 0.8, 0.35, -0.55, 1.0, 0.6]
+        return HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 4) {
+                ForEach(Array(bars.enumerated()), id: \.offset) { _, value in
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 22)
+                            .overlay(alignment: .bottom) {
+                                if value > 0 {
+                                    RoundedRectangle(cornerRadius: 2).fill(palette.profit.color).frame(height: 22 * value)
+                                }
+                            }
+                        Rectangle().fill(palette.textTertiary.color.opacity(0.5)).frame(height: 1)
+                        Color.clear
+                            .frame(height: 22)
+                            .overlay(alignment: .top) {
+                                if value < 0 {
+                                    RoundedRectangle(cornerRadius: 2).fill(palette.loss.color).frame(height: 22 * -value)
+                                }
+                            }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .background(palette.card.color)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.smallCornerRadius, style: .continuous))
+
+            HStack(spacing: 6) {
+                Image(systemName: "rosette")
+                    .foregroundStyle(palette.accent.color)
+                Text("12")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(palette.textPrimary.color)
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(palette.warning.color)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(palette.elevated.color)
+            .clipShape(Capsule())
+        }
     }
 
     private func previewRow(symbol: String, side: String, label: String, amount: String, color: HexColor) -> some View {

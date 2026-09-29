@@ -50,13 +50,19 @@ struct ThemePalette: Identifiable, Equatable, Hashable, Sendable {
     enum Group: String, CaseIterable, Identifiable, Sendable {
         case pastel
         case solid
+        /// Eigen thema's van de gebruiker (`CustomTheme`).
+        case custom
 
         var id: String { rawValue }
+
+        /// Groepen met ingebouwde paletten, in weergavevolgorde.
+        static let builtIn: [Group] = [.pastel, .solid]
 
         var displayName: String {
             switch self {
             case .solid: return AppStrings.Themes.groupSolid
             case .pastel: return AppStrings.Themes.groupPastel
+            case .custom: return AppStrings.Themes.groupCustom
             }
         }
     }

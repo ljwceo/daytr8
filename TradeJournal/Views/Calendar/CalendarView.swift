@@ -148,6 +148,7 @@ struct CalendarView: View {
 
 #Preview {
     CalendarView()
+        .environment(RewardsViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }

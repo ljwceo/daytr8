@@ -145,6 +145,7 @@ struct TradesView: View {
 #Preview {
     TradesView()
         .environment(OnboardingViewModel())
+        .environment(RewardsViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }
