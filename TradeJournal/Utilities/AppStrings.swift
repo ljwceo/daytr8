@@ -90,6 +90,7 @@ enum AppStrings {
         static let settingsTitle = "Thema"
         static let groupSolid = "Effen"
         static let groupPastel = "Pastel"
+        static let groupCustom = "Eigen thema's"
         static let preview = "Voorbeeld"
         static let previewAccount = "Vandaag"
         static let previewWin = "Winst"
@@ -106,6 +107,53 @@ enum AppStrings {
         static let mint = "Mint"
         static let perzik = "Perzik"
         static let babyblauw = "Babyblauw"
+
+        // Eigen thema's
+        static let newTheme = "Nieuw thema"
+        static let editTheme = "Thema bewerken"
+        static let defaultCustomName = "Mijn thema"
+        static let manageCustom = "Eigen thema's"
+        static let manageCustomFooter = "Tik op een thema om het te kiezen; bewerk of verwijder het hier."
+        static let resetToStandard = "Terug naar standaardthema"
+        static let editorName = "Naam"
+        static let editorColors = "Kleuren"
+        static let editorBrightness = "Helderheid"
+        static let editorSaturation = "Verzadiging"
+        static let editorHex = "HEX"
+        static let editorInvalidHex = "Gebruik 6 tekens, bijv. #5AB0FF."
+        static let editorGenerate = "Palet uit accent"
+        static let editorGenerateDark = "Donker palet uit accent"
+        static let editorGenerateLight = "Licht palet uit accent"
+        static let editorResetColors = "Standaardkleuren"
+        static let editorContrastOK = "Alle tekst- en resultaatkleuren halen WCAG AA."
+        static let editorAutoFix = "Contrast automatisch corrigeren"
+        static let editorDelete = "Thema verwijderen"
+        static func editorContrastIssue(_ field: String, ratio: Double, minimum: Double) -> String {
+            "\(field): contrast \(ratio.formatted(.number.precision(.fractionLength(1)))):1 (min. \(minimum.formatted(.number.precision(.fractionLength(1)))):1)"
+        }
+        static func deleteConfirm(_ name: String) -> String { "\"\(name)\" verwijderen?" }
+    }
+
+    // MARK: - Rewards (animaties en medailles)
+
+    enum Rewards {
+        static let tradeSaved = "Trade opgeslagen"
+        static let skipHint = "Tik om over te slaan"
+        static func hotStreak(_ count: Int) -> String { "🔥 \(count) wins op rij!" }
+
+        static let medalsTitle = "Medailles"
+        static let toastTitle = "Medaille behaald!"
+        static let toastHint = "Tik voor je medailles"
+        static let summaryInitialTitle = "Je medailles staan klaar"
+        static let summaryTitle = "Nieuwe medailles!"
+        static func summaryMessage(_ count: Int) -> String {
+            count == 1 ? "1 medaille behaald op basis van je trades" : "\(count) medailles behaald op basis van je trades"
+        }
+        static func unlockedSummary(_ unlocked: Int, of total: Int) -> String { "\(unlocked) van \(total) medailles behaald" }
+        static let unlocked = "Behaald"
+        static let hiddenName = "Verborgen medaille"
+        static let hiddenDetail = "Deze medaille blijft een verrassing tot je hem behaalt."
+        static let openMedalsAccessibility = "Medailles openen"
     }
 
     // MARK: - Instellingen

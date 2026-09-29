@@ -98,7 +98,11 @@ Regels:
   `Theme`-kleuren in `body` (niet cachen in een `let`/viewmodel), anders
   tekent een view niet mee bij een themawissel.
 - Nieuw palet of nieuwe token? Voeg hem toe aan **alle** paletten;
-  `ThemeStoreTests` controleert WCAG AA-contrast.
+  `ThemeStoreTests` controleert WCAG AA-contrast. Eigen thema's van de
+  gebruiker (`Models/CustomTheme.swift`) krijgen hun afgeleide tokens uit
+  `Utilities/ThemePaletteGenerator.swift` — een nieuwe token daar ook afleiden.
+- Animaties: respecteer `accessibilityReduceMotion` en de instelling
+  `RewardSettings.animationsEnabled`; houd ze kort en overslaanbaar.
 - Tekst op een accentvlak: `Theme.onAccent` (niet wit, niet `textPrimary`).
 - Rijen in `List`/`Form`: zet `.listRowBackground(Theme.card)` op elke `Section`
   (of losse rij), anders krijgen ze de systeemkleur i.p.v. de themakleur.

@@ -415,7 +415,10 @@ public struct BackupService {
 
         if let settings = payload.settings, let defaults = settingsDefaults {
             SettingsMigrator.restore(settings, into: defaults)
-            if defaults === UserDefaults.standard { ThemeStore.shared.reload() }
+            if defaults === UserDefaults.standard {
+                ThemeStore.shared.reload()
+                MedalStore.shared.reload()
+            }
         }
         return backup.summary
     }

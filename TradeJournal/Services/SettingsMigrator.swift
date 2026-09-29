@@ -73,6 +73,12 @@ public enum SettingsMigrator {
     public static let backedUpKeys: [String] = [
         Keys.schemaVersion,
         ThemeStore.Keys.selectedPaletteID,
+        ThemeStore.Keys.customThemes,
+        MedalStore.Keys.unlocked,
+        MedalStore.Keys.initialSyncDone,
+        RewardSettings.Keys.animationsEnabled,
+        RewardSettings.Keys.medalNotificationsEnabled,
+        RewardSettings.Keys.openReportsAfterSave,
         ReminderSettings.Keys.isEnabled,
         ReminderSettings.Keys.hour,
         ReminderSettings.Keys.minute,

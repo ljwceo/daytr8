@@ -29,6 +29,9 @@ struct TradeJournalApp: App {
     /// Welkomstmelding, rondleiding en tabselectie.
     @State private var onboarding = OnboardingViewModel()
 
+    /// Animatie na het opslaan van een trade, medailles en medaillemeldingen.
+    @State private var rewards = RewardsViewModel()
+
     /// Backups die via de Bestanden-app of het deelmenu binnenkomen.
     @State private var incomingFiles = IncomingFileRouter()
 
@@ -51,6 +54,7 @@ struct TradeJournalApp: App {
                 }
                 .environment(appLock)
                 .environment(onboarding)
+                .environment(rewards)
                 .environment(incomingFiles)
                 // "Deel → Daytr8" / "Open in" vanuit Bestanden: iOS levert een
                 // kopie in Documents/Inbox; RootTabView toont hem als sheet.
@@ -65,6 +69,9 @@ struct TradeJournalApp: App {
                     SeedService.seedDefaultsIfNeeded(in: container.mainContext)
                     // Automatische backup naar de gekozen map (als ingesteld).
                     AutoBackupService().runIfDue(context: container.mainContext, isLaunch: true)
+                    // Medailles (achteraf) berekenen; de eerste keer stil, met
+                    // hooguit één samenvatting.
+                    rewards.sync(in: container.mainContext)
                     // Laadscherm kort laten staan en dan uitfaden.
                     try? await Task.sleep(nanoseconds: 600_000_000)
                     withAnimation(.easeOut(duration: 0.3)) { isSplashVisible = false }
@@ -81,6 +88,8 @@ struct TradeJournalApp: App {
                         Task { await appLock.didBecomeActive() }
                         // Bij terugkeer naar de voorgrond: dagelijkse backup inhalen.
                         AutoBackupService().runIfDue(context: container.mainContext, isLaunch: false)
+                        // Na een import of herstelde backup kunnen er medailles bijkomen.
+                        rewards.sync(in: container.mainContext)
                     default:
                         break
                     }

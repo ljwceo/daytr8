@@ -11,6 +11,7 @@ struct TradeFormView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(RewardsViewModel.self) private var rewards
 
     @State private var viewModel: TradeFormViewModel
     @State private var photoSelection: [PhotosPickerItem] = []
@@ -84,7 +85,9 @@ struct TradeFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Opslaan") {
-                        viewModel.save(in: modelContext)
+                        let trade = viewModel.save(in: modelContext)
+                        // Animatie (nieuwe trade), doorsturen en medailles.
+                        rewards.tradeSaved(trade, isNew: !viewModel.mode.isEditing, in: modelContext)
                         dismiss()
                     }
                     .disabled(!viewModel.isValid)

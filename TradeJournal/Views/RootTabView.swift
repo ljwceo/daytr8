@@ -13,6 +13,7 @@ struct RootTabView: View {
     @Environment(OnboardingViewModel.self) private var onboarding
     @Environment(AppLockViewModel.self) private var appLock
     @Environment(IncomingFileRouter.self) private var incomingFiles
+    @Environment(RewardsViewModel.self) private var rewards
 
     /// De binnengekomen backup die nu als sheet getoond wordt.
     @State private var incomingBackup: IncomingBackup?
@@ -31,6 +32,7 @@ struct RootTabView: View {
 
     var body: some View {
         @Bindable var onboarding = onboarding
+        @Bindable var rewards = rewards
 
         TabView(selection: $onboarding.selectedTab) {
             DashboardView()
@@ -66,6 +68,49 @@ struct RootTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: isBannerShowing)
+        // Animatie na het opslaan van een trade (tik = overslaan).
+        .overlay {
+            if let celebration = rewards.celebration, !appLock.isLocked {
+                TradeSavedCelebrationView(celebration: celebration) {
+                    withAnimation(.easeOut(duration: 0.25)) { rewards.finishCelebration() }
+                }
+                .id(celebration.id)
+                .transition(.opacity)
+            }
+        }
+        // Medaillemeldingen, één voor één.
+        .overlay(alignment: .top) {
+            if let toast = rewards.currentToast, !appLock.isLocked, !isBannerShowing {
+                MedalToastView(
+                    toast: toast,
+                    onOpen: { rewards.openToast() },
+                    onDismiss: { withAnimation(.easeInOut(duration: 0.3)) { rewards.dismissToast() } }
+                )
+                .id(toast.id)
+                .padding(.horizontal, Theme.cardPadding)
+                .padding(.top, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rewards.currentToast?.id)
+        .task(id: rewards.currentToast?.id) {
+            guard rewards.currentToast != nil else { return }
+            try? await Task.sleep(for: RewardsViewModel.toastDuration)
+            if !Task.isCancelled {
+                withAnimation(.easeInOut(duration: 0.3)) { rewards.dismissToast() }
+            }
+        }
+        .onChange(of: rewards.requestedTab) { _, tab in
+            guard let tab else { return }
+            onboarding.selectedTab = tab
+            rewards.requestedTab = nil
+        }
+        .sheet(isPresented: $rewards.isOverviewPresented) {
+            NavigationStack {
+                MedalsView(showsCloseButton: true)
+            }
+            .environment(rewards)
+        }
         .task(id: isBannerShowing) {
             // Net als een pushmelding verdwijnt de melding na een poosje vanzelf;
             // de rondleiding blijft te vinden via Meer.
@@ -139,5 +184,6 @@ private struct IncomingBackup: Identifiable {
     RootTabView()
         .environment(AppLockViewModel())
         .environment(OnboardingViewModel())
+        .environment(RewardsViewModel())
         .environment(IncomingFileRouter())
 }
