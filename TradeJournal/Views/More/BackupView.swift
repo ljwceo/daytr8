@@ -10,30 +10,14 @@ struct BackupView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var viewModel = BackupViewModel()
-    @State private var importerKind: ImporterKind = .restore
-    @State private var isImporterPresented = false
-
-    /// Eén `fileImporter` voor zowel backup-bestanden als mappen: meerdere
-    /// `fileImporter`s op dezelfde view werken in SwiftUI niet betrouwbaar.
-    private enum ImporterKind {
-        /// Backupbestand: de .zip of een losse backup.json.
-        case restore
-        /// Uitgepakte backupmap (backup.json + images/).
-        case restoreFolder
-        /// Map voor automatische backups.
-        case folder
-
-        var contentTypes: [UTType] {
-            switch self {
-            // Géén `.folder` hier: staat die in de lijst, dan kiest de iOS-
-            // documentkiezer alleen nog mappen en zijn bestanden grijs.
-            // `.data` als vangnet (bijv. een json die iCloud anders typeert);
-            // BackupArchiveOpener herkent de inhoud zelf.
-            case .restore: return [.zip, .json, .data]
-            case .restoreFolder, .folder: return [.folder]
-            }
-        }
-    }
+    /// Toont de iOS-documentkiezer via UIKit (i.p.v. `.fileImporter`, dat op
+    /// het toestel niet betrouwbaar terugriep).
+    @State private var picker = DocumentPickerPresenter()
+    /// Backup die uit de importmap gekozen is; na een geslaagde restore
+    /// verhuist hij naar `Import/Hersteld/`.
+    @State private var inboxSelection: URL?
+    /// Wijzigt na een restore, zodat de importmap-sectie opnieuw scant.
+    @State private var inboxRefreshID = UUID()
 
     var body: some View {
         List {
@@ -59,9 +43,16 @@ struct BackupView: View {
             statusSection
             backupSection
             restoreSection
+            // Importmap "Op mijn iPhone › Daytr8 › Import" (werkt zonder kiezer).
+            ImportInboxSection { url in
+                inboxSelection = url
+                viewModel.diagnostics.record("Importmap: backup gekozen", detail: url.lastPathComponent)
+                Task { await viewModel.prepareRestore(from: url) }
+            }
+            .id(inboxRefreshID)
             autoBackupSection
             exportSection
-
+            diagnosticsSection
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
@@ -76,17 +67,6 @@ struct BackupView: View {
             }
         }
         .onAppear { viewModel.refreshFromSettings() }
-        .fileImporter(isPresented: $isImporterPresented, allowedContentTypes: importerKind.contentTypes) { result in
-            switch result {
-            case .success(let url):
-                switch importerKind {
-                case .restore, .restoreFolder: viewModel.prepareRestore(from: url)
-                case .folder: viewModel.setAutoBackupFolder(url, context: modelContext)
-                }
-            case .failure(let error):
-                viewModel.errorMessage = error.localizedDescription
-            }
-        }
         .sheet(item: $viewModel.shareFile, onDismiss: {
             viewModel.shareSheetDismissed()
         }) { file in
@@ -102,6 +82,7 @@ struct BackupView: View {
         ) {
             Button("Wis huidige data en herstel", role: .destructive) {
                 viewModel.confirmRestore(into: modelContext)
+                markInboxBackupRestoredIfNeeded()
             }
             Button("Annuleren", role: .cancel) {
                 viewModel.cancelRestore()
@@ -155,6 +136,17 @@ struct BackupView: View {
         .listRowBackground(Theme.card)
     }
 
+    /// Na een geslaagde restore uit de importmap: backup naar `Import/Hersteld/`.
+    private func markInboxBackupRestoredIfNeeded() {
+        guard let url = inboxSelection else { return }
+        inboxSelection = nil
+        guard viewModel.errorMessage == nil, viewModel.pendingRestore == nil else { return }
+        if let moved = try? ImportInboxService().markRestored(url: url) {
+            viewModel.diagnostics.record("Importmap: backup verplaatst naar Hersteld", detail: moved.lastPathComponent)
+        }
+        inboxRefreshID = UUID()
+    }
+
     /// De gekozen, al ingelezen backup — bovenaan, zodat hij na het sluiten van
     /// de bestandskiezer direct in beeld is. Bewust geen automatisch dialoog-
     /// venster: dat opent SwiftUI niet zolang de bestandskiezer nog sluit
@@ -187,14 +179,16 @@ struct BackupView: View {
     private var restoreSection: some View {
         Section {
             Button(role: .destructive) {
-                importerKind = .restore
-                isImporterPresented = true
+                pick(.backupFile, action: "Herstel uit backupbestand") { url in
+                    Task { await viewModel.prepareRestore(from: url, isTemporaryCopy: true) }
+                }
             } label: {
                 Label("Herstel uit backupbestand…", systemImage: "arrow.counterclockwise")
             }
             Button(role: .destructive) {
-                importerKind = .restoreFolder
-                isImporterPresented = true
+                pick(.folder, action: "Herstel uit uitgepakte backupmap") { url in
+                    Task { await viewModel.prepareRestore(from: url) }
+                }
             } label: {
                 Label("Herstel uit uitgepakte backupmap…", systemImage: "folder")
             }
@@ -214,8 +208,7 @@ struct BackupView: View {
                         .foregroundStyle(Theme.textPrimary)
                     Spacer()
                     Button("Wijzig") {
-                        importerKind = .folder
-                        isImporterPresented = true
+                        pickAutoBackupFolder(action: "Wijzig backupmap")
                     }
                 }
 
@@ -256,8 +249,7 @@ struct BackupView: View {
                 }
             } else {
                 Button {
-                    importerKind = .folder
-                    isImporterPresented = true
+                    pickAutoBackupFolder(action: "Kies backupmap")
                 } label: {
                     Label("Kies backupmap in Bestanden…", systemImage: "folder.badge.plus")
                 }
@@ -285,6 +277,49 @@ struct BackupView: View {
             Text("Eén rij per trade, inclusief P&L, R-multiple, confluences en notities. Dit bestand kan later ook weer geïmporteerd worden.")
         }
         .listRowBackground(Theme.card)
+    }
+
+    private var diagnosticsSection: some View {
+        Section {
+            NavigationLink {
+                ImportLogView(log: viewModel.diagnostics)
+            } label: {
+                Label("Importlogboek", systemImage: "list.bullet.rectangle")
+            }
+        } header: {
+            Text("Diagnose")
+        } footer: {
+            Text("Lukt herstellen niet? Deel het importlogboek: daarin staat elke stap van het kiezen en inlezen.\n\(ImportDiagnosticsLog.appVersionDescription)")
+        }
+        .listRowBackground(Theme.card)
+    }
+
+    // MARK: - Bestandskiezer
+
+    /// Opent de documentkiezer; `onPick` krijgt de gekozen URL. Annuleren en
+    /// een kiezer die niet opent komen als melding bovenaan.
+    @MainActor
+    private func pick(_ mode: DocumentPickerPresenter.Mode, action: String, onPick: @escaping (URL) -> Void) {
+        viewModel.recordPickerRequest(action)
+        do {
+            try picker.present(mode) { url in
+                if let url {
+                    onPick(url)
+                } else {
+                    viewModel.pickerCancelled()
+                }
+            }
+        } catch {
+            viewModel.pickerFailed(error)
+        }
+    }
+
+    @MainActor
+    private func pickAutoBackupFolder(action: String) {
+        pick(.folder, action: action) { url in
+            // Volgende runloop-tik: de kiezer sluit eerst.
+            Task { @MainActor in viewModel.setAutoBackupFolder(url, context: modelContext) }
+        }
     }
 
     private func summaryText(_ summary: BackupService.Summary) -> String {

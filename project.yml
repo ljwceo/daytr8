@@ -62,6 +62,20 @@ targets:
         NSPhotoLibraryAddUsageDescription: TradeJournal slaat screenshots op in je fotobibliotheek wanneer je dat kiest.
         NSCameraUsageDescription: TradeJournal gebruikt de camera om foto's van je charts en platform direct aan je trades toe te voegen en er, op je toestel, tradegegevens uit te lezen.
         NSFaceIDUsageDescription: TradeJournal gebruikt Face ID om je journal te beveiligen wanneer je de app-vergrendeling inschakelt.
+        # Backups (.zip / backup.json) openen via Bestanden of "Deel → Daytr8".
+        # Alternate: Daytr8 verschijnt in het deelmenu, maar wordt niet de
+        # standaard-app voor zips. Niet in-place: iOS levert een kopie in
+        # Documents/Inbox (geen security scope nodig).
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Backup
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.zip-archive
+              - public.json
+        LSSupportsOpeningDocumentsInPlace: false
+        # Maakt "Op mijn iPhone › Daytr8" zichtbaar in de Bestanden-app.
+        UIFileSharingEnabled: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tradejournal.app

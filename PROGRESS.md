@@ -1216,6 +1216,87 @@ uiterlijk aanpasbaar maken met centrale kleurtokens.
   map daarboven, losse json (screenshots overgeslagen), zip zonder extensie,
   lege map → "backup.json ontbreekt".
 
+## Herstellen: drie ingangen + importlogboek
+
+Klacht op het toestel: "ik tik op de zip / backup.json en er gebeurt niks".
+
+### Kiezer + asynchroon inlezen + logboek (pakket A)
+
+- Oorzaak (meest waarschijnlijk): de callback van `.fileImporter` deed het
+  hele inlezen synchroon op de main thread (`NSFileCoordinator` + kopie +
+  uitpakken). Bij een iCloud-bestand dat nog niet lokaal stond blokkeerde dat
+  tot de download klaar was — de kiezer kon niet sluiten en er was geen
+  voortgang te zien. Daarnaast was het één `.fileImporter` met wisselende
+  `allowedContentTypes` op een view met ook `.sheet` en `.confirmationDialog`,
+  wat in iOS 17/18 niet betrouwbaar terugroept. Er was ook geen manier om te
+  zien óf de kiezer terugriep.
+- `Views/Components/DocumentPickerPresenter.swift` (nieuw): toont
+  `UIDocumentPickerViewController` via UIKit vanaf de bovenste view controller
+  van het key window, met een sterk vastgehouden `DocumentPickerCoordinator`
+  die de completion precies één keer aanroept (`nil` = geannuleerd).
+  Backupbestand: `[.zip, .json, .data]` met `asCopy: true` (iOS downloadt en
+  kopieert vóór de callback); mappen (uitgepakte backup, map voor automatische
+  backup): `[.folder]` zonder kopie (bookmark). Weigert als er al een kiezer
+  open is of een ander scherm nog opent/sluit (melding bovenaan).
+- `BackupViewModel` is nu `@MainActor`. `prepareRestore(from:isTemporaryCopy:) async`:
+  direct "Bestand ontvangen: … – inlezen…" + spinner; iCloud-download
+  aanvragen, (gecoördineerd) kopiëren en `loadBackup` in `Task.detached`
+  (`BackupRestorePreparer`); fout mét bestandsnaam. Tijdelijke werkmap wordt
+  opgeruimd na fout, annuleren of herstellen. Annuleren in de kiezer →
+  "Geen bestand gekozen.".
+- `Services/ImportDiagnosticsLog.swift` (nieuw): ringbuffer van 300 regels in
+  Application Support (`Diagnostics/import-log.json`), met elke stap: knop,
+  kiezer getoond/callback/geannuleerd, bestandsinfo (type, grootte, iCloud,
+  downloadstatus), security scope, kopie, archieftype, samenvatting, fouten
+  (domein + code). `exportText()` met appversie, build en iOS-versie.
+- `Views/More/ImportLogView.swift` (nieuw): lijst + Kopieer / Deel / Wis;
+  bereikbaar via "Importlogboek" onderaan Backup & herstel, met in de footer
+  "Versie X (build N)".
+- `BackupView`: `.fileImporter` en `ImporterKind` weg; knoppen via de
+  presenter; kaart "Backup gevonden" en meldingen bovenaan ongewijzigd.
+- Tests: `BackupRestoreAsyncTests` (zip, uitgepakte map, losse json, kopie
+  van de kiezer + herstellen, ongeldig/ontbrekend bestand, annuleren,
+  delegate exact één callback, kiezermodi) en `ImportDiagnosticsLogTests`
+  (ringbuffer, persistentie, export-kop, afkappen, foutcodes).
+- Op het toestel testen: zip in iCloud (ook nog niet gedownload), zip op
+  "Op mijn iPhone", backup.json uit een uitgepakte map, knop uitgepakte map,
+  annuleren; bij problemen het importlogboek delen.
+
+### Openen via Bestanden/Deel (pakket B)
+
+- Daytr8 staat als *Alternate*-handler voor `.zip` en `.json` in
+  `CFBundleDocumentTypes` (`project.yml` + `Info.plist`): lang indrukken →
+  Deel → Daytr8 (of "Open in" vanuit Mail) stuurt een backup direct naar de
+  app, zonder de bestandskiezer.
+- `LSSupportsOpeningDocumentsInPlace` = false: iOS levert een kopie in
+  `Documents/Inbox`; `IncomingFileRouter` ruimt die na afloop op.
+  `UIFileSharingEnabled` = true: "Op mijn iPhone › Daytr8" zichtbaar in
+  Bestanden (voor de importmap).
+- `Services/IncomingFileRouter.swift` vangt `.onOpenURL` op; `RootTabView`
+  toont `Views/More/IncomingBackupView.swift` als sheet, pas na ontgrendelen
+  en niet tegelijk met de rondleiding. Die leest in via `BackupViewModel`,
+  toont de samenvatting en herstelt na bevestiging.
+- CI zet `CURRENT_PROJECT_VERSION` op het run-nummer: elke IPA heeft een eigen
+  buildnummer (zichtbaar onder Backup & herstel → footer).
+- Tests: `IncomingFileRouterTests`, `InfoPlistTests`.
+- Beperking: tikken op een `.zip` in Bestanden pakt hem nog steeds uit; gebruik
+  lang indrukken → Deel → Daytr8.
+
+### Importmap (pakket C)
+
+- Route zonder kiezer: kopieer in Bestanden een backup (.zip, backup.json of
+  de uitgepakte map) naar "Op mijn iPhone › Daytr8 › Import".
+- `Services/ImportInboxService.swift`: `ensureFolder()` maakt
+  `Documents/Import/` + `LEESMIJ.txt` (zodat de map zichtbaar is); `scan()`
+  vindt backups in `Import/`, `Documents/` en `Documents/Inbox/` (nieuwste
+  eerst; `Hersteld/`, verborgen en `.icloud` overgeslagen); `markRestored`
+  verplaatst naar `Import/Hersteld/` met unieke naam.
+- `Views/More/ImportInboxSection.swift`: sectie "Backups in de Daytr8-map" in
+  Backup & herstel (ververst bij openen, terugkeer naar de app en "Vernieuw");
+  tikken → `prepareRestore`; na een geslaagde restore verhuist `BackupView`
+  de backup naar `Hersteld/`.
+- Tests: `ImportInboxServiceTests`.
+
 ## Volgende fase
 
 SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
