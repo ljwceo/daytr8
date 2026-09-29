@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 /// Een bestand dat via de share sheet gedeeld / in Bestanden bewaard wordt.
 public struct ShareableFile: Identifiable, Equatable {
@@ -15,6 +16,11 @@ public struct ShareableFile: Identifiable, Equatable {
 
 /// Viewmodel achter `BackupView`: handmatige backup, restore, automatische
 /// backup naar een map in Bestanden en CSV-export.
+///
+/// `@MainActor`: alle state is UI-state; het zware inlezen van een backup
+/// (kopiëren, iCloud-download, uitpakken) loopt in `prepareRestore` los van
+/// de main thread.
+@MainActor
 @Observable
 public final class BackupViewModel {
 
@@ -35,6 +41,9 @@ public final class BackupViewModel {
     /// Een ingelezen backup die op bevestiging wacht.
     public private(set) var pendingRestore: BackupService.LoadedBackup?
     public var isConfirmingRestore = false
+    /// Tijdelijke werkmap van `pendingRestore` (opgeruimd na herstellen of
+    /// annuleren).
+    private var pendingWorkDirectory: URL?
 
     // Gespiegeld uit `BackupSettings` zodat de view automatisch ververst.
     public private(set) var lastBackupDate: Date?
@@ -44,6 +53,9 @@ public final class BackupViewModel {
     public private(set) var isReminderDismissed = false
     public private(set) var lastAutoBackupError: String?
 
+    /// Stap-voor-stap logboek van kiezen en inlezen (Importlogboek).
+    public let diagnostics: ImportDiagnosticsLog
+
     private let settings: BackupSettings
     private let backupService: BackupService
     private let autoBackupService: AutoBackupService
@@ -52,12 +64,14 @@ public final class BackupViewModel {
     public init(
         settings: BackupSettings = BackupSettings(),
         backupService: BackupService = BackupService(),
-        csvExportService: CSVExportService = CSVExportService()
+        csvExportService: CSVExportService = CSVExportService(),
+        diagnostics: ImportDiagnosticsLog? = nil
     ) {
         self.settings = settings
         self.backupService = backupService
         self.autoBackupService = AutoBackupService(settings: settings, backupService: backupService)
         self.csvExportService = csvExportService
+        self.diagnostics = diagnostics ?? .shared
         self.autoBackupFrequency = settings.autoBackupFrequency
         refreshFromSettings()
     }
@@ -123,6 +137,25 @@ public final class BackupViewModel {
         }
     }
 
+    // MARK: - Kiezer
+
+    /// Logt welke knop de bestandskiezer opent.
+    public func recordPickerRequest(_ action: String) {
+        diagnostics.record("Knop getikt", detail: action)
+    }
+
+    /// De gebruiker sloot de kiezer zonder iets te kiezen.
+    public func pickerCancelled() {
+        errorMessage = nil
+        statusMessage = "Geen bestand gekozen."
+    }
+
+    /// De kiezer kon niet geopend worden.
+    public func pickerFailed(_ error: Error) {
+        statusMessage = nil
+        errorMessage = error.localizedDescription
+    }
+
     // MARK: - Restore
 
     /// Leest een gekozen backup in (nog zonder iets te wissen). De view toont
@@ -130,62 +163,88 @@ public final class BackupViewModel {
     ///
     /// `url` mag de `.zip` zijn, maar ook de map die de Bestanden-app ervan
     /// maakt als je op de zip tikt, of alleen `backup.json` daaruit. Alles
-    /// wordt eerst naar de tijdelijke map gekopieerd (gecoördineerd, zodat
-    /// iCloud-bestanden die nog niet lokaal staan eerst gedownload worden) en
-    /// blijft zo leesbaar na het sluiten van de security scope.
-    public func prepareRestore(from url: URL) {
-        perform {
-            let didAccess = url.startAccessingSecurityScopedResource()
-            defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+    /// wordt eerst naar een eigen tijdelijke map gekopieerd (bij iCloud
+    /// gecoördineerd, zodat bestanden eerst gedownload worden) en blijft zo
+    /// leesbaar na het sluiten van de security scope. Het kopiëren en
+    /// inlezen loopt buiten de main thread, zodat de bestandskiezer kan
+    /// sluiten en de voortgang zichtbaar is.
+    ///
+    /// - Parameter isTemporaryCopy: `url` is een kopie die de kiezer voor ons
+    ///   maakte (`asCopy`); die wordt verplaatst i.p.v. gekopieerd.
+    public func prepareRestore(from url: URL, isTemporaryCopy: Bool = false) async {
+        let name = url.lastPathComponent
+        isWorking = true
+        errorMessage = nil
+        statusMessage = "Bestand ontvangen: \(name) – inlezen…"
+        diagnostics.record("Bestand ontvangen", detail: "\(name)\(isTemporaryCopy ? " (kopie van de kiezer)" : "")")
 
-            let workDirectory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("restore-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
-            let local = workDirectory.appendingPathComponent(url.lastPathComponent)
-            try Self.coordinatedCopy(from: url, to: local)
+        // Een eerder ingelezen, niet bevestigde backup vervalt.
+        discardPendingRestore()
 
-            // Los gekozen backup.json: probeer de images-map ernaast mee te
-            // nemen (lukt alleen als iOS er toegang toe geeft; anders worden
-            // de screenshots bij de restore overgeslagen).
-            if url.pathExtension.lowercased() == "json" {
-                let images = url.deletingLastPathComponent().appendingPathComponent("images", isDirectory: true)
-                try? Self.coordinatedCopy(from: images, to: workDirectory.appendingPathComponent("images", isDirectory: true))
-            }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        diagnostics.record(
+            "Security scope",
+            detail: didAccess ? "geopend" : "niet nodig of niet gekregen (normaal bij een kopie of lokaal bestand)"
+        )
 
-            // De view toont de gevonden backup; bevestigen gaat via een knop
-            // (een dialoog die hier direct opent, slikt SwiftUI in terwijl de
-            // bestandskiezer nog sluit).
-            self.pendingRestore = try self.backupService.loadBackup(at: local)
+        let job = BackupRestorePreparer.Job(source: url, isTemporaryCopy: isTemporaryCopy, service: backupService)
+        let outcome = await Task.detached(priority: .userInitiated) {
+            BackupRestorePreparer.run(job)
+        }.value
+
+        if didAccess { url.stopAccessingSecurityScopedResource() }
+        for note in outcome.notes {
+            diagnostics.record(note.step, detail: note.detail)
         }
-    }
 
-    /// Kopieert een bestand of map via `NSFileCoordinator`, zodat iCloud-
-    /// bestanden eerst lokaal gedownload worden.
-    private static func coordinatedCopy(from source: URL, to destination: URL) throws {
-        var coordinationError: NSError?
-        var copyError: Error?
-        NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { readURL in
-            do {
-                try FileManager.default.copyItem(at: readURL, to: destination)
-            } catch {
-                copyError = error
-            }
+        switch outcome.result {
+        case .success(let backup):
+            pendingRestore = backup
+            pendingWorkDirectory = outcome.workDirectory
+            statusMessage = nil
+            let summary = backup.summary
+            diagnostics.record(
+                "Samenvatting",
+                detail: "formaat \(summary.formatVersion), \(summary.tradeCount) trades, \(summary.accountCount) accounts, \(summary.journalCount) journals, \(summary.screenshotCount) screenshots"
+            )
+        case .failure(let error):
+            statusMessage = nil
+            errorMessage = "Kon \(name) niet inlezen: \(error.localizedDescription)"
+            diagnostics.record(error: error, step: "Fout bij inlezen")
+            try? FileManager.default.removeItem(at: outcome.workDirectory)
         }
-        if let error = coordinationError ?? copyError { throw error }
+        isWorking = false
     }
 
     public func confirmRestore(into context: ModelContext) {
         guard let backup = pendingRestore else { return }
+        diagnostics.record("Herstel bevestigd")
         perform {
             let summary = try self.backupService.restore(backup, into: context)
             self.statusMessage = "Backup hersteld: \(summary.tradeCount) trades, \(summary.journalCount) journals, \(summary.screenshotCount) screenshots."
-            self.pendingRestore = nil
+            self.diagnostics.record("Herstel voltooid", detail: "\(summary.tradeCount) trades, \(summary.journalCount) journals, \(summary.screenshotCount) screenshots")
+            self.discardPendingRestore()
+        }
+        if let errorMessage {
+            diagnostics.record("Fout bij herstellen", detail: errorMessage)
         }
     }
 
     public func cancelRestore() {
-        pendingRestore = nil
+        if pendingRestore != nil {
+            diagnostics.record("Herstel geannuleerd")
+        }
+        discardPendingRestore()
         isConfirmingRestore = false
+    }
+
+    /// Vergeet de ingelezen backup en ruimt zijn tijdelijke werkmap op.
+    private func discardPendingRestore() {
+        pendingRestore = nil
+        if let directory = pendingWorkDirectory {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        pendingWorkDirectory = nil
     }
 
     // MARK: - Automatische backup
@@ -198,6 +257,12 @@ public final class BackupViewModel {
     /// Slaat de gekozen map op en maakt er meteen een eerste backup in —
     /// zo zie je direct of het werkt (anders pas bij de volgende app-start).
     public func setAutoBackupFolder(_ url: URL, context: ModelContext) {
+        diagnostics.record("Backupmap gekozen", detail: url.lastPathComponent)
+        defer {
+            if let errorMessage {
+                diagnostics.record("Fout bij instellen backupmap", detail: errorMessage)
+            }
+        }
         perform {
             defer { self.refreshFromSettings() }
             try self.autoBackupService.setFolder(url)
@@ -244,5 +309,169 @@ public final class BackupViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+// MARK: - Inlezen buiten de main thread
+
+/// Het zware deel van `BackupViewModel.prepareRestore`: iCloud-download
+/// aanvragen, kopiëren naar een eigen werkmap en de backup inlezen. Loopt in
+/// een `Task.detached`; alles wat het wil loggen komt terug als `notes`.
+enum BackupRestorePreparer {
+
+    struct Job: @unchecked Sendable {
+        let source: URL
+        /// Kopie die de kiezer voor ons maakte (`asCopy`): mag verplaatst worden.
+        let isTemporaryCopy: Bool
+        let service: BackupService
+    }
+
+    struct Note: Sendable {
+        let step: String
+        let detail: String?
+    }
+
+    struct Outcome: @unchecked Sendable {
+        let notes: [Note]
+        let result: Result<BackupService.LoadedBackup, Error>
+        /// Eigen tijdelijke map met de kopie; bij een fout op te ruimen.
+        let workDirectory: URL
+    }
+
+    static func run(_ job: Job, fileManager: FileManager = .default) -> Outcome {
+        var notes: [Note] = []
+        func note(_ step: String, _ detail: String? = nil) { notes.append(Note(step: step, detail: detail)) }
+
+        let source = job.source
+        let workDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("restore-\(UUID().uuidString)", isDirectory: true)
+
+        do {
+            let values = try? source.resourceValues(forKeys: [
+                .contentTypeKey, .fileSizeKey, .isDirectoryKey,
+                .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey
+            ])
+            let isDirectory = values?.isDirectory ?? false
+            let isUbiquitous = values?.isUbiquitousItem ?? false
+            note("Bestandsinfo", describe(values, url: source))
+
+            try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+            let local = workDirectory.appendingPathComponent(source.lastPathComponent, isDirectory: isDirectory)
+
+            if isUbiquitous {
+                requestDownload(of: source, isDirectory: isDirectory, fileManager: fileManager, note: note)
+            }
+
+            if job.isTemporaryCopy {
+                do {
+                    try fileManager.moveItem(at: source, to: local)
+                    note("Kopie", "kopie van de kiezer verplaatst naar werkmap")
+                } catch {
+                    try fileManager.copyItem(at: source, to: local)
+                    note("Kopie", "kopie van de kiezer gekopieerd (verplaatsen lukte niet)")
+                }
+            } else if isUbiquitous || !isInsideAppContainer(source) {
+                try coordinatedCopy(from: source, to: local)
+                note("Kopie", "gecoördineerd gekopieerd (\(isUbiquitous ? "iCloud" : "extern"))")
+            } else {
+                try fileManager.copyItem(at: source, to: local)
+                note("Kopie", "lokaal gekopieerd")
+            }
+
+            // Los gekozen backup.json (niet als kopie): probeer de images-map
+            // ernaast mee te nemen (lukt alleen als iOS er toegang toe geeft;
+            // anders worden de screenshots bij de restore overgeslagen).
+            if !job.isTemporaryCopy, !isDirectory, source.pathExtension.lowercased() == "json" {
+                let images = source.deletingLastPathComponent().appendingPathComponent("images", isDirectory: true)
+                let target = workDirectory.appendingPathComponent("images", isDirectory: true)
+                do {
+                    try coordinatedCopy(from: images, to: target)
+                    note("Images naast backup.json", "meegenomen")
+                } catch {
+                    note("Images naast backup.json", "niet meegenomen: \(ImportDiagnosticsLog.describe(error))")
+                }
+            }
+
+            let backup = try job.service.loadBackup(at: local)
+            note("Archieftype", archiveDescription(backup.reader))
+            return Outcome(notes: notes, result: .success(backup), workDirectory: workDirectory)
+        } catch {
+            return Outcome(notes: notes, result: .failure(error), workDirectory: workDirectory)
+        }
+    }
+
+    /// Kopieert een bestand of map via `NSFileCoordinator`, zodat iCloud-
+    /// bestanden eerst lokaal gedownload worden. Niet op de main thread
+    /// aanroepen: dit kan wachten tot de download klaar is.
+    static func coordinatedCopy(from source: URL, to destination: URL) throws {
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { readURL in
+            do {
+                try FileManager.default.copyItem(at: readURL, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+        if let error = coordinationError ?? copyError { throw error }
+    }
+
+    /// Vraagt iCloud om het item (en bij een map de inhoud) te downloaden.
+    /// De gecoördineerde kopie wacht daarna op de download.
+    private static func requestDownload(of url: URL, isDirectory: Bool, fileManager: FileManager, note: (String, String?) -> Void) {
+        var requested = 0
+        var failures: [String] = []
+        func request(_ item: URL) {
+            let status = (try? item.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus
+            guard status != .current else { return }
+            do {
+                try fileManager.startDownloadingUbiquitousItem(at: item)
+                requested += 1
+            } catch {
+                failures.append("\(item.lastPathComponent): \(ImportDiagnosticsLog.describe(error))")
+            }
+        }
+        request(url)
+        if isDirectory, let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: [.ubiquitousItemDownloadingStatusKey]) {
+            for case let item as URL in enumerator {
+                request(item)
+            }
+        }
+        var detail = "\(requested) item(s) aangevraagd"
+        if !failures.isEmpty {
+            detail += "; mislukt: " + failures.prefix(3).joined(separator: "; ")
+        }
+        note("iCloud-download", detail)
+    }
+
+    /// Bestand binnen de eigen app-container (tmp, Inbox, Documents)?
+    static func isInsideAppContainer(_ url: URL) -> Bool {
+        let home = URL(fileURLWithPath: NSHomeDirectory()).resolvingSymlinksInPath().path
+        let path = url.resolvingSymlinksInPath().path
+        return path == home || path.hasPrefix(home + "/")
+    }
+
+    private static func describe(_ values: URLResourceValues?, url: URL) -> String {
+        guard let values else { return "\(url.lastPathComponent): geen bestandsinfo leesbaar" }
+        var parts = [url.lastPathComponent]
+        parts.append("type \(values.contentType?.identifier ?? "?")")
+        if values.isDirectory == true { parts.append("map") }
+        if let size = values.fileSize { parts.append("\(size) bytes") }
+        if values.isUbiquitousItem == true {
+            parts.append("iCloud, download: \(values.ubiquitousItemDownloadingStatus?.rawValue ?? "?")")
+        } else {
+            parts.append("niet iCloud")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private static func archiveDescription(_ archive: BackupArchive) -> String {
+        if archive is ZipReader { return "zip" }
+        if let folder = archive as? BackupFolder {
+            let isLooseJSON = folder.payloadURL.lastPathComponent != BackupService.payloadPath
+                || !FileManager.default.fileExists(atPath: folder.root.appendingPathComponent("images").path)
+            return isLooseJSON ? "losse backup.json (zonder images-map)" : "uitgepakte map met images"
+        }
+        return String(describing: type(of: archive))
     }
 }
