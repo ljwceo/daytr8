@@ -16,6 +16,11 @@ struct TradesView: View {
     @State private var viewModel = TradesListViewModel()
     @State private var showingNewTrade = false
     @State private var showingMT5Import = false
+    /// Zoektekst zoals getypt; pas na een korte pauze toegepast, zodat typen
+    /// niet bij elke letter de hele lijst doorzoekt.
+    @State private var searchInput = ""
+    /// Gefilterde/gesorteerde lijst één keer per wijziging berekenen.
+    @State private var cache = WidgetComputationCache()
     @State private var tradeToDelete: Trade?
 
     private var quickAddedIDs: Set<UUID> {
@@ -23,7 +28,13 @@ struct TradesView: View {
     }
 
     private var visibleTrades: [Trade] {
-        viewModel.filteredAndSorted(trades, quickAddedIDs: quickAddedIDs)
+        let key = [
+            viewModel.searchText, viewModel.quickFilter.rawValue, viewModel.sortOption.rawValue,
+            viewModel.directionFilter?.rawValue ?? "-", String(importMarks.count)
+        ].joined(separator: "|")
+        return cache.value(key, version: WidgetComputationCache.version(for: trades)) {
+            viewModel.filteredAndSorted(trades, quickAddedIDs: quickAddedIDs)
+        }
     }
 
     var body: some View {
@@ -65,7 +76,15 @@ struct TradesView: View {
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .background(Theme.background)
-                    .searchable(text: $viewModel.searchText, prompt: "Zoek op symbool, playbook, tag...")
+                    .searchable(text: $searchInput, prompt: "Zoek op symbool, playbook, tag...")
+                    .task(id: searchInput) {
+                        // Even wachten tot het typen stopt; leegmaken direct.
+                        if !searchInput.isEmpty {
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                            guard !Task.isCancelled else { return }
+                        }
+                        viewModel.searchText = searchInput
+                    }
                 }
             }
             .navigationTitle("Trades")
