@@ -26,6 +26,9 @@ final class OnboardingViewModel {
     /// `TradesView` opent het tradeformulier zodra dit `true` is.
     private(set) var isNewTradeRequested = false
 
+    /// `CalendarView` opent deze maand (maandweergave) zodra hij gezet is.
+    private(set) var calendarMonthRequest: CalendarMonthRoute?
+
     @ObservationIgnored private var pendingDestination: Destination = .stay
     @ObservationIgnored private let settings: OnboardingSettings
 
@@ -91,6 +94,21 @@ final class OnboardingViewModel {
             isNewTradeRequested = true
         }
         pendingDestination = .stay
+    }
+
+    // MARK: - Navigatie tussen tabs
+
+    /// Opent de Kalender-tab in de maandweergave van `month` in `year`
+    /// (tik op de jaar-heatmap).
+    func openCalendarMonth(_ month: Int, year: Int) {
+        calendarMonthRequest = CalendarMonthRoute(year: year, month: month)
+        selectedTab = .calendar
+    }
+
+    /// Geeft het openstaande kalenderverzoek (één keer) terug.
+    func consumeCalendarMonthRequest() -> CalendarMonthRoute? {
+        defer { calendarMonthRequest = nil }
+        return calendarMonthRequest
     }
 
     /// Geeft `true` (één keer) als er een nieuwe trade gevraagd is.

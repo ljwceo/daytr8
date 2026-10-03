@@ -64,6 +64,15 @@ public final class CalendarViewModel {
         showYearOverview = false
     }
 
+    /// Toont de maandweergave van `route` (vanuit een andere tab, bijv. de
+    /// jaar-heatmap op het dashboard): sluit een open dagdetail en het
+    /// jaaroverzicht.
+    func show(_ route: CalendarMonthRoute) {
+        selectedDate = nil
+        displayedYear = route.year
+        selectMonth(route.month, in: route.year)
+    }
+
     // MARK: - Weergave
 
     public var monthTitle: String {

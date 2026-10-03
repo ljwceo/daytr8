@@ -59,6 +59,31 @@ public struct YearHeatmapGrid: Equatable, Sendable {
         return (slot / Self.rowCount, slot % Self.rowCount)
     }
 
+    /// De maand (1–12) bij een horizontale positie in kolommen (`0` = linker-
+    /// rand van de eerste kolom; fracties toegestaan).
+    ///
+    /// Een maand loopt van zijn begin-kolom (`monthMarkers`) tot de begin-
+    /// kolom van de volgende maand; een kolom waarin een maand begint hoort
+    /// dus bij die nieuwe maand. Links van januari geeft januari, rechts van
+    /// december geeft december.
+    public func month(atColumn column: Double) -> Int {
+        guard let first = monthMarkers.first else { return 1 }
+        guard column.isFinite else { return column > 0 ? (monthMarkers.last?.month ?? 12) : first.month }
+        var month = first.month
+        for marker in monthMarkers where Double(marker.column) <= column {
+            month = marker.month
+        }
+        return month
+    }
+
+    /// De maand bij een tik op `x` punten vanaf de linkerrand van de heatmap,
+    /// met `leadingInset` punten voor de weekdaglabels en `cellSize` punten
+    /// per kolom. Een tik op de labels of naast het raster telt ook.
+    public func month(atX x: Double, leadingInset: Double, cellSize: Double) -> Int {
+        guard cellSize > 0 else { return monthMarkers.first?.month ?? 1 }
+        return month(atColumn: (x - leadingInset) / cellSize)
+    }
+
     /// De dag op `column`/`row`, of `nil` buiten het jaar.
     public func day(column: Int, row: Int) -> Date? {
         guard column >= 0, row >= 0, row < Self.rowCount else { return nil }

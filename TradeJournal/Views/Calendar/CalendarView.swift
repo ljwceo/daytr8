@@ -9,6 +9,9 @@ struct CalendarView: View {
 
     @State private var viewModel = CalendarViewModel()
 
+    /// Gedeelde navigatie: "open deze maand" vanuit de jaar-heatmap.
+    @Environment(OnboardingViewModel.self) private var navigation: OnboardingViewModel?
+
     /// Backtest-modus: standaard staan backtest-trades niet in de kalender.
     /// Gedeeld met `DayDetailView` zodat dagcel en dagdetail overeenkomen.
     @AppStorage(CalendarViewModel.includeBacktestKey) private var includeBacktest = false
@@ -112,6 +115,14 @@ struct CalendarView: View {
                 DayDetailView(date: date)
             }
         }
+        .onAppear(perform: applyMonthRequest)
+        .onChange(of: navigation?.calendarMonthRequest) { applyMonthRequest() }
+    }
+
+    /// Opent de gevraagde maand (tik op de jaar-heatmap) in de maandweergave.
+    private func applyMonthRequest() {
+        guard let route = navigation?.consumeCalendarMonthRequest() else { return }
+        viewModel.show(route)
     }
 
     private var navigationHeader: some View {

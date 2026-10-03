@@ -138,6 +138,8 @@ struct WidgetRenderContext {
     /// In de bibliotheek: niet interactief.
     let isPreview: Bool
     let onOpenDay: (Date) -> Void
+    /// Opent de Kalender-tab in de maandweergave van (maand 1–12, jaar).
+    let onOpenMonth: (_ month: Int, _ year: Int) -> Void
     let onEditSettings: () -> Void
 
     /// Filters van deze widget (dashboard + eigen periode/accounts).

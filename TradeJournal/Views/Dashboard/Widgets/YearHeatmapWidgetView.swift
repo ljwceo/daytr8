@@ -13,6 +13,8 @@ struct YearHeatmapWidgetView: View {
 
     @State private var year = Calendar.current.component(.year, from: Date())
     @State private var availableWidth: CGFloat = 0
+    /// Telt de tikken die een maand openen (trigger voor de haptische tik).
+    @State private var monthOpenCount = 0
 
     private let calendar = Calendar.current
     private let monthLabelHeight: CGFloat = 14
@@ -30,6 +32,7 @@ struct YearHeatmapWidgetView: View {
             legend(data)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sensoryFeedback(.selection, trigger: monthOpenCount)
     }
 
     // MARK: - Data
@@ -169,13 +172,23 @@ struct YearHeatmapWidgetView: View {
                 }
             }
             .frame(width: width, height: height)
+            // Tikvlak over de volle breedte: ook naast het raster telt een tik.
+            .frame(minWidth: availableWidth, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture(coordinateSpace: .local) { location in
-                openDay(at: location, grid: grid, cell: cell, data: data)
+                openMonth(at: location, grid: grid, cell: cell)
             }
             .allowsHitTesting(!context.isPreview)
             .accessibilityElement()
             .accessibilityLabel("Heatmap \(year), \(summaryLabel) \(summaryText(data))")
+            .accessibilityHint("Kies een maand bij Acties om die in de kalender te openen.")
+            .accessibilityActions {
+                ForEach(grid.monthMarkers, id: \.month) { marker in
+                    Button("Open \(calendar.monthSymbols[marker.month - 1]) \(String(year)) in de kalender") {
+                        openMonth(marker.month)
+                    }
+                }
+            }
         }
         .defaultScrollAnchor(year == currentYear ? .trailing : .leading)
         .frame(height: height)
@@ -188,13 +201,17 @@ struct YearHeatmapWidgetView: View {
         )
     }
 
-    private func openDay(at location: CGPoint, grid: YearHeatmapGrid, cell: CGFloat, data: HeatmapYearData) {
-        guard cell > 0 else { return }
-        let column = Int(((location.x - Theme.heatmapLabelWidth) / cell).rounded(.down))
-        let row = Int(((location.y - monthLabelHeight) / cell).rounded(.down))
-        guard location.x >= Theme.heatmapLabelWidth, location.y >= monthLabelHeight,
-              let day = grid.day(column: column, row: row), data.values[day] != nil else { return }
-        context.onOpenDay(day)
+    /// Een tik ergens op de heatmap opent de maand die het dichtst bij de
+    /// vinger zat (alleen de x-positie telt; zie `YearHeatmapGrid.month(atX:)`).
+    private func openMonth(at location: CGPoint, grid: YearHeatmapGrid, cell: CGFloat) {
+        let month = grid.month(atX: Double(location.x), leadingInset: Double(Theme.heatmapLabelWidth), cellSize: Double(cell))
+        openMonth(month)
+    }
+
+    private func openMonth(_ month: Int) {
+        guard !context.isPreview else { return }
+        monthOpenCount += 1
+        context.onOpenMonth(month, year)
     }
 
     // MARK: - Legenda
@@ -247,7 +264,7 @@ struct YearHeatmapWidgetDefinition: DashboardWidgetDefinition {
     let type = DashboardWidgetType.yearHeatmap
     let title = "Jaar-heatmap"
     let systemImage = "circle.grid.3x3.fill"
-    let summary = "Elke dag van het jaar als stip, gekleurd op P&L, aantal trades, win rate of R. Tik op een dag voor details."
+    let summary = "Elke dag van het jaar als stip, gekleurd op P&L, aantal trades, win rate of R. Tik op de heatmap om naar die maand te gaan."
     let defaultSize = WidgetSize.large
     let supportedSizes: [WidgetSize] = [.large]
     let options: WidgetSettingsOptions = [.accounts, .heatmapMetric]

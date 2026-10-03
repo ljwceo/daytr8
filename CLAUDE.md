@@ -152,6 +152,14 @@ Regels:
   backup hoort → `SettingsMigrator.backedUpKeys`.
 - Maand-/dag-/weektotalen (kalender, doelen, limieten) altijd via
   `CalendarAggregationService` (`dayAggregates` / `netPnL(of:in:)`).
+- Backups (automatisch én handmatig) lopen buiten de main thread via
+  `Services/BackupExportActor.swift` (`@ModelActor`, eigen context) en
+  `Services/BackupCoordinator.swift` (één automatische backup tegelijk;
+  `BackupSettings` alleen op de main actor bijwerken). Nooit `exportBackup`
+  op de `mainContext` aanroepen vanuit app-start of scene-fase.
+- Navigatie tussen tabs loopt via `OnboardingViewModel` in de environment
+  (`selectedTab`, `isNewTradeRequested`, `calendarMonthRequest` /
+  `openCalendarMonth`); geen singletons.
 - Backup-/import-/export-formaat: JSON + losse afbeeldingen, verpakt in `.zip`.
   Houd het versienummer van het formaat in de payload op zodat migraties mogelijk zijn.
 

@@ -1507,6 +1507,70 @@ trades (met relatie-reads in SwiftData). Nu één keer per datawijziging
 - Medailles: `RewardsViewModel.sync(in:)` (bij elke terugkeer naar de app)
   slaat over als de trades niet veranderd zijn.
 
+## Backup op de achtergrond + heatmap → kalendermaand
+
+### Deel 1 — automatische backup niet meer op de voorgrond
+
+- `Services/BackupExportActor.swift` (nieuw): `@ModelActor` met een eigen
+  `ModelContext` op dezelfde `ModelContainer`. Roept dezelfde
+  `BackupService.exportBackup` aan (formaat/`formatVersion` ongewijzigd),
+  kopieert naar de gekozen map en ruimt op. Geen SwiftData-modellen over de
+  actorgrens; de actor wordt in een `Task.detached` aangemaakt.
+  `exportInBackground` voor de handmatige backup (share sheet).
+- `Services/BackupCoordinator.swift` (nieuw, `@MainActor @Observable`, in de
+  environment vanuit `TradeJournalApp`): `runAutoBackupIfDue` /
+  `runAutoBackupNow`. Loopt er al een backup, dan wacht een tweede aanvraag
+  daarop (app-start + `.active` = één backup). Slaat de `mainContext` eerst op,
+  werkt `BackupSettings` (laatste datum, `lastAutoBackupError`) na afloop op
+  de main actor bij. `waitForRunningBackup()` vóór een restore.
+- `AutoBackupService`: kopiëren + opruimen als `static store(_:in:keep:)`
+  (gedeeld door sync- en achtergrondpad); sync-API blijft bestaan.
+- `BackupViewModel`: `createBackup(in:)`, `setAutoBackupFolder(_:coordinator:container:)`
+  en `runAutoBackupNow(coordinator:container:)` lopen op de achtergrond met
+  voortgangstekst (`progressMessage`); de oude sync-methodes blijven.
+- `BackupView`: voortgangsindicator met tekst, "Automatische backup bezig…",
+  status ververst als een automatische backup klaar is; restore wacht op een
+  lopende backup (ook `IncomingBackupView`).
+- `TradeJournalApp`: start/voorgrond starten de backup in een `Task`, de UI
+  wacht er niet op.
+- Tests: `BackgroundBackupTests` (achtergrond-export = zelfde payload als
+  export op de main thread, niet-opgeslagen wijzigingen zitten erin, twee
+  gelijktijdige aanvragen = één backup, fout → `lastAutoBackupError` en weer
+  gewist bij succes, lege journal/niet due = niets, viewmodel-flows).
+
+### Deel 2 — tik op de heatmap opent de dichtstbijzijnde maand
+
+- `YearHeatmapGrid.month(atColumn:)` / `month(atX:leadingInset:cellSize:)`:
+  pure functie; een maand loopt van zijn begin-kolom tot die van de volgende,
+  begrensd op jan–dec.
+- `Models/CalendarMonthRoute.swift` (nieuw) + `OnboardingViewModel.openCalendarMonth`
+  / `consumeCalendarMonthRequest` (zelfde patroon als `isNewTradeRequested`);
+  `CalendarViewModel.show(_:)` opent de maandweergave (sluit jaaroverzicht en
+  dagdetail). `CalendarView` past het verzoek toe bij verschijnen/wijzigen.
+- `WidgetRenderContext.onOpenMonth`; `DashboardView` stuurt door naar de
+  Kalender-tab.
+- `YearHeatmapWidgetView`: tik ergens op de heatmap (ook maandlabels,
+  weekdaglabels of naast het raster) → maand; haptische tik
+  (`sensoryFeedback(.selection)`), geen animatie. VoiceOver: hint + actie per
+  maand ("Open maart 2024 in de kalender"). Uitleg in de bibliotheek
+  bijgewerkt. Een tik opent niet meer het dagdetail (dat kan via de kalender).
+- Tests: `HeatmapMonthNavigationTests` (midden in een maand, grens, links van
+  januari, rechts van december, schrikkeljaar/niet-schrikkeljaar, punten →
+  kolommen, route en `CalendarViewModel.show`).
+
+### Met de hand testen
+
+- Automatische backup "Bij elke app-start" met veel trades/screenshots: de
+  app moet direct bedienbaar zijn; daarna klopt "Laatste backup" in Meer →
+  Backup & herstel, de backup-status-widget en de herinnering.
+- Map loskoppelen/onbereikbaar maken → foutmelding verschijnt na afloop.
+- Backup maken (.zip): voortgangsindicator, daarna share sheet; "Bewaar in
+  Bestanden" telt als backup.
+- Heatmap: tik op een stip, op een maandlabel, links op de weekdaglabels en
+  rechts naast december → Kalender-tab op de juiste maand (ook vanuit een
+  open dagdetail in de kalender, en met backtest-trades aan/uit, in een
+  licht en donker thema). VoiceOver: acties per maand op de heatmap.
+
 ## Volgende fase
 
 SPEC.md §1–§14 zijn geïmplementeerd, op het aanmaken/bewerken van eigen

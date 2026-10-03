@@ -50,6 +50,8 @@ struct DashboardView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(RewardsViewModel.self) private var rewards
+    /// Navigatie tussen tabs (tik op de jaar-heatmap → Kalender-maand).
+    @Environment(OnboardingViewModel.self) private var navigation
     @AppStorage(LiveQuoteSettings.Keys.isEnabled) private var liveQuoteEnabled = true
     @AppStorage(LiveQuoteSettings.Keys.symbolOverride) private var liveQuoteSymbolOverride = ""
 
@@ -492,6 +494,7 @@ struct DashboardView: View {
             cacheVersion: version,
             isPreview: isPreview,
             onOpenDay: { day in path.append(DashboardDayRoute(date: day)) },
+            onOpenMonth: { month, year in navigation.openCalendarMonth(month, year: year) },
             onEditSettings: onEdit
         )
     }
@@ -575,6 +578,7 @@ struct WidgetReorderModifier: ViewModifier {
 #Preview {
     DashboardView()
         .environment(RewardsViewModel())
+        .environment(OnboardingViewModel())
         .modelContainer(for: AppSchema.models, inMemory: true)
         .preferredColorScheme(.dark)
 }
