@@ -1483,6 +1483,18 @@ op de branch door de CI gebouwd (unit tests + unsigned IPA).
 - Drag & drop van widgets op iPhone (lang indrukken in de bewerkmodus) en de
   heatmap (horizontaal scrollen, tikken op een stip) op het toestel testen.
 
+### Fix na test op toestel: lege heatmap en traagheid
+
+- Jaar-heatmap toonde alleen kop en legenda: `WidgetComputationCache` gaf
+  voor optionele resultaten (het raster) `nil` terug zonder te rekenen
+  (`nil as? Optional<X>` slaagt). Gerepareerd + regressietest.
+- Heatmap past nu in de breedte (hele jaar zichtbaar, cel 4,5–18 pt).
+- Equity curve en drawdown: `ChartSampling.downsample` (één punt per
+  tijdstip, max. ~300 punten met behoud van pieken/dalen); de
+  driehoek-uitschieters kwamen van dubbele datums bij `.monotone`.
+- Cachesleutel per widget één keer opgebouwd; limietbanner en symboollijst
+  gecachet.
+
 ## Volgende fase
 
 SPEC.md §1–§14 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
