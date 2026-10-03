@@ -49,6 +49,10 @@ public struct BackupPayload: Codable, Equatable {
     /// wordt door oudere app-versies genegeerd, dus geen nieuwe `formatVersion`.
     public var dashboards: [DashboardDTO]? = nil
 
+    /// Markeringen "snel toegevoegd" (MT5-screenshotimport). Optioneel, zelfde
+    /// regels als `dashboards`; ontbreekt → geen trades gemarkeerd.
+    public var tradeImportMarks: [TradeImportMarkDTO]? = nil
+
     // MARK: - DTO's
 
     public struct AccountDTO: Codable, Equatable {
@@ -254,6 +258,13 @@ public struct BackupPayload: Codable, Equatable {
         /// `DashboardFilterState` als JSON-tekst (leeg = geen filters).
         public var filters: String
         public var widgets: [DashboardWidgetDTO]
+    }
+
+    public struct TradeImportMarkDTO: Codable, Equatable {
+        public var id: UUID
+        public var tradeID: UUID
+        public var source: String
+        public var importedAt: Date
     }
 
     public struct NotebookNoteDTO: Codable, Equatable {

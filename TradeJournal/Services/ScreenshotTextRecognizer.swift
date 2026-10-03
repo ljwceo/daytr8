@@ -70,7 +70,7 @@ public struct VisionTextRecognizer: ScreenshotTextRecognizing {
 
         return (request.results ?? []).compactMap { observation in
             guard let candidate = observation.topCandidates(1).first else { return nil }
-            return RecognizedTextBox(text: candidate.string, boundingBox: observation.boundingBox)
+            return RecognizedTextBox(text: candidate.string, boundingBox: observation.boundingBox, confidence: candidate.confidence)
         }
     }
 }
@@ -80,10 +80,13 @@ public struct VisionTextRecognizer: ScreenshotTextRecognizing {
 public struct RecognizedTextBox: Equatable, Sendable {
     public var text: String
     public var boundingBox: CGRect
+    /// Zekerheid van Vision (0...1). 1 voor tekst zonder OCR (tests, fixtures).
+    public var confidence: Float
 
-    public init(text: String, boundingBox: CGRect) {
+    public init(text: String, boundingBox: CGRect, confidence: Float = 1) {
         self.text = text
         self.boundingBox = boundingBox
+        self.confidence = confidence
     }
 }
 

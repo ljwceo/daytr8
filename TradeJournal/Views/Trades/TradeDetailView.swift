@@ -13,6 +13,9 @@ struct TradeDetailView: View {
 
     let trade: Trade
 
+    /// Markeringen "snel toegevoegd" (MT5-import).
+    @Query private var importMarks: [TradeImportMark]
+
     private let statsService = StatsService()
     private let editingService = TradeEditingService()
 
@@ -25,6 +28,33 @@ struct TradeDetailView: View {
 
     private var metrics: TradeMetrics { statsService.metrics(for: trade) }
     private var currency: String { trade.account?.currency ?? "USD" }
+
+    /// Uitleg + acties voor een snel toegevoegde trade (MT5-import).
+    private var quickAddedCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                QuickAddedBadgeView()
+                Text("Snel toegevoegd via MT5-import")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            Text("Alleen de cijfers zijn geïmporteerd. Vul confluences, playbook en notities aan via Bewerken; haal daarna de markering weg.")
+                .font(.caption)
+                .foregroundStyle(Theme.textSecondary)
+            HStack(spacing: 16) {
+                Button("Aanvullen") { showingEdit = true }
+                Button("Markering weghalen") {
+                    MT5ScreenshotImportService().removeMark(from: trade, in: modelContext)
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Theme.accent)
+        }
+        .padding(Theme.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.warning.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+    }
 
     var body: some View {
         // Een trade die intussen gewist is (bijv. via "Alles wissen" of een
@@ -47,6 +77,7 @@ struct TradeDetailView: View {
             Theme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if importMarks.contains(where: { $0.tradeID == trade.id }) { quickAddedCard }
                     headerCard
                     // Snelle trade zonder prijzen: geen lege prijzenkaart.
                     if trade.manualNetPnL == nil || trade.entryPrice != 0 { priceCard }

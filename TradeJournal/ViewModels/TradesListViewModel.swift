@@ -35,6 +35,8 @@ public final class TradesListViewModel {
         case losses
         case thisWeek
         case thisMonth
+        /// Snel toegevoegd (MT5-screenshotimport), nog aan te vullen.
+        case quickAdded
 
         public var id: String { rawValue }
 
@@ -46,6 +48,7 @@ public final class TradesListViewModel {
             case .losses: return "Verlies"
             case .thisWeek: return "Deze week"
             case .thisMonth: return "Deze maand"
+            case .quickAdded: return "Snel toegevoegd"
             }
         }
     }
@@ -72,7 +75,9 @@ public final class TradesListViewModel {
 
     /// Past zoekterm, snelfilter, richtingsfilter en sortering toe op
     /// `trades`. Puur, dus unit-testbaar zonder een levende `ModelContext`.
-    public func filteredAndSorted(_ trades: [Trade], now: Date = Date(), calendar: Calendar = .current) -> [Trade] {
+    /// - Parameter quickAddedIDs: id's van trades met de markering "snel
+    ///   toegevoegd" (`TradeImportMark`), voor de snelfilter.
+    public func filteredAndSorted(_ trades: [Trade], now: Date = Date(), calendar: Calendar = .current, quickAddedIDs: Set<UUID> = []) -> [Trade] {
         var result = trades
 
         if let directionFilter {
@@ -96,6 +101,8 @@ public final class TradesListViewModel {
             if let monthAgo = calendar.date(byAdding: .month, value: -1, to: now) {
                 result = result.filter { $0.entryDate >= monthAgo }
             }
+        case .quickAdded:
+            result = result.filter { quickAddedIDs.contains($0.id) }
         }
 
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)

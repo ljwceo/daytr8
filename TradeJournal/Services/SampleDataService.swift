@@ -250,6 +250,7 @@ public enum SampleDataService {
     /// tussentijds opslaan houdt het geheugengebruik bij jaren aan data beperkt.
     public static func wipeAll(in context: ModelContext) {
         // Volgorde: eerst kinderen, dan ouders.
+        deleteAll(TradeImportMark.self, in: context)
         deleteAll(TradeExecution.self, in: context)
         deleteAll(TradeScreenshot.self, in: context)
         deleteAll(PlaybookRuleAdherence.self, in: context)
