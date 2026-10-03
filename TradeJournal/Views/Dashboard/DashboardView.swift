@@ -84,15 +84,17 @@ struct DashboardView: View {
                 )
             } else {
                 ScrollView {
+                    // Eén keer per render: de dataversie voor alle caches.
+                    let version = cacheVersion
                     VStack(alignment: .leading, spacing: 16) {
-                        banners
+                        banners(version: version)
                         if dashboards.count > 1 || layout.isEditing {
                             tabsBar
                         }
                         DashboardFilterBar(
                             viewModel: viewModel,
                             accounts: accounts,
-                            symbols: viewModel.availableSymbols(from: trades),
+                            symbols: cache.value("dashboard|symbols", version: version) { viewModel.availableSymbols(from: trades) },
                             playbooks: playbooks,
                             confluences: confluences
                         )
@@ -100,7 +102,7 @@ struct DashboardView: View {
                             editActions
                         }
                         if let dashboard = currentDashboard {
-                            widgetGrid(dashboard)
+                            widgetGrid(dashboard, version: version)
                         }
                     }
                     .padding(16)
@@ -110,12 +112,14 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private var banners: some View {
+    private func banners(version: String) -> some View {
         if liveQuoteEnabled, liveQuote.symbol != nil {
             LiveQuoteCardView(viewModel: liveQuote)
         }
         BackupReminderBannerView()
-        GoalWarningBannerView(statuses: viewModel.goalStatuses(accounts: accounts, trades: trades))
+        GoalWarningBannerView(statuses: cache.value("dashboard|goals", version: version) {
+            viewModel.goalStatuses(accounts: accounts, trades: trades)
+        })
     }
 
     private var tabsBar: some View {
@@ -334,13 +338,12 @@ struct DashboardView: View {
 
     // MARK: - Widgetraster
 
-    private func widgetGrid(_ dashboard: Dashboard) -> some View {
+    private func widgetGrid(_ dashboard: Dashboard, version: String) -> some View {
         let widgets = dashboard.sortedWidgets.filter { layout.isEditing || DashboardWidgetRegistry.definition(for: $0) != nil }
         let sizes = widgets.map { widget in
             DashboardWidgetRegistry.definition(for: widget)?.effectiveSize(widget.size) ?? .large
         }
         let rows = DashboardLayoutService.rows(for: sizes)
-        let version = cacheVersion
         let filterKey = String(describing: viewModel.filterState)
 
         return VStack(spacing: Theme.widgetSpacing) {
@@ -475,6 +478,7 @@ struct DashboardView: View {
             widgetID: widgetID,
             size: size,
             settings: settings,
+            settingsKey: settings.jsonString,
             allTrades: trades,
             accounts: accounts,
             rules: rules,

@@ -12,7 +12,8 @@ struct EquityCurveChartView: View {
         if points.isEmpty {
             emptyState
         } else {
-            Chart(points) { point in
+            // Index als id: meerdere punten op hetzelfde tijdstip mogen.
+            Chart(Array(points.enumerated()), id: \.offset) { _, point in
                 LineMark(x: .value("Datum", point.date), y: .value("Waarde", point.value))
                     .interpolationMethod(.monotone)
                     .foregroundStyle(lineColor)

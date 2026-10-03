@@ -15,16 +15,28 @@ struct CalendarView: View {
 
     private let aggregationService = CalendarAggregationService()
 
+    /// Dag- en maandtotalen worden één keer per datawijziging berekend, niet
+    /// bij elke render (maand wisselen, tikken op een dag).
+    @State private var cache = WidgetComputationCache()
+
     private var visibleTrades: [Trade] {
         CalendarViewModel.visibleTrades(trades, includeBacktest: includeBacktest)
     }
 
+    private var dataVersion: String {
+        WidgetComputationCache.version(for: trades, extra: "\(includeBacktest)|\(viewModel.calendar.timeZone.identifier)")
+    }
+
     private var dayAggregates: [Date: DayAggregate] {
-        aggregationService.dayAggregates(for: visibleTrades, calendar: viewModel.calendar)
+        cache.value("days", version: dataVersion) {
+            aggregationService.dayAggregates(for: visibleTrades, calendar: viewModel.calendar)
+        }
     }
 
     private var monthAggregates: [Date: MonthAggregate] {
-        aggregationService.monthAggregates(fromDayAggregates: dayAggregates, calendar: viewModel.calendar)
+        cache.value("months", version: dataVersion) {
+            aggregationService.monthAggregates(fromDayAggregates: dayAggregates, calendar: viewModel.calendar)
+        }
     }
 
     var body: some View {

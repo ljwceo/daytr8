@@ -118,6 +118,8 @@ struct WidgetRenderContext {
     let widgetID: UUID
     let size: WidgetSize
     let settings: WidgetSettings
+    /// `settings` als tekst, één keer per render gemaakt (sleutel voor de cache).
+    let settingsKey: String
     /// Alle trades (ongefilterd); de widget filtert via `filteredTrades`.
     let allTrades: [Trade]
     let accounts: [Account]
@@ -155,7 +157,7 @@ struct WidgetRenderContext {
     }
 
     func cached<T>(_ name: String, compute: () -> T) -> T {
-        cache.value("\(widgetID.uuidString)|\(settings.jsonString)|\(baseFilterKey)|\(name)", version: cacheVersion, compute: compute)
+        cache.value("\(widgetID.uuidString)|\(settingsKey)|\(baseFilterKey)|\(name)", version: cacheVersion, compute: compute)
     }
 }
 

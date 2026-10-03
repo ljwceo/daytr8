@@ -63,6 +63,8 @@ final class RewardsViewModel {
     @ObservationIgnored private var queue: [Toast] = []
     @ObservationIgnored let store: MedalStore
     @ObservationIgnored private let service: MedalService
+    /// Vingerafdruk van de trades bij de laatste sync (zie `sync(in:)`).
+    @ObservationIgnored private var lastSyncFingerprint: String?
     @ObservationIgnored private let settings: RewardSettings
     @ObservationIgnored private let statsService = StatsService()
 
@@ -83,6 +85,11 @@ final class RewardsViewModel {
     /// met hun oorspronkelijke datum, en volgt hooguit één samenvatting.
     func sync(in context: ModelContext) {
         let trades = (try? context.fetch(FetchDescriptor<Trade>())) ?? []
+        // Bij elke terugkeer naar de app: niets opnieuw doorrekenen als de
+        // trades niet veranderd zijn (aantal + laatste wijziging).
+        let fingerprint = WidgetComputationCache.version(for: trades)
+        guard fingerprint != lastSyncFingerprint else { return }
+        lastSyncFingerprint = fingerprint
         sync(trades: trades)
     }
 

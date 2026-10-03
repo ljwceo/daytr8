@@ -249,6 +249,48 @@ final class WidgetDataServiceTests: XCTestCase {
         XCTAssertEqual([first, second, third], [1, 1, 3])
         XCTAssertEqual(calls, 2)
     }
+
+    /// Regressie: een optioneel resultaat (zoals het heatmap-raster) werd
+    /// nooit berekend, waardoor de heatmap leeg bleef.
+    func test_cache_computesOptionalValues() {
+        let cache = WidgetComputationCache()
+        var calls = 0
+        let first: Int? = cache.value("grid", version: "1") { calls += 1; return 7 }
+        let second: Int? = cache.value("grid", version: "1") { calls += 1; return 8 }
+        XCTAssertEqual(first, 7)
+        XCTAssertEqual(second, 7)
+        XCTAssertEqual(calls, 1)
+        let none: Int? = cache.value("leeg", version: "1") { calls += 1; return nil }
+        XCTAssertNil(none)
+        let grid: YearHeatmapGrid? = cache.value("raster", version: "1") { YearHeatmapGrid(year: 2026, calendar: calendar) }
+        XCTAssertEqual(grid?.days.count, 365)
+    }
+
+    // MARK: - Grafiekpunten
+
+    func test_chartSampling_dedupesDatesAndKeepsExtremes() {
+        let start = date(2024, 1, 1)
+        var points: [DateValuePoint] = []
+        for index in 0..<2_000 {
+            let value = index == 1_234 ? 99_999 : (index == 777 ? -88_888 : Double(index))
+            points.append(DateValuePoint(date: start.addingTimeInterval(Double(index) * 3_600), value: value))
+        }
+        // Twee trades op hetzelfde tijdstip: alleen de laatste telt.
+        points.append(DateValuePoint(date: start, value: 5))
+
+        let sampled = ChartSampling.downsample(points, maxPoints: 300)
+        XCTAssertLessThanOrEqual(sampled.count, 302)
+        XCTAssertTrue(sampled.contains { $0.value == 99_999 }, "piek blijft")
+        XCTAssertTrue(sampled.contains { $0.value == -88_888 }, "dal blijft")
+        XCTAssertEqual(sampled.last?.value, 1_999)
+        XCTAssertEqual(sampled.first?.date, start)
+        for (a, b) in zip(sampled, sampled.dropFirst()) {
+            XCTAssertLessThan(a.date, b.date, "strikt oplopend")
+        }
+
+        let few = [DateValuePoint(date: start, value: 1), DateValuePoint(date: start, value: 2), DateValuePoint(date: start.addingTimeInterval(60), value: 3)]
+        XCTAssertEqual(ChartSampling.downsample(few).map(\.value), [2, 3])
+    }
 }
 
 private extension ModelContext {

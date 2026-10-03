@@ -10,7 +10,7 @@ struct EquityCurveWidgetDefinition: DashboardWidgetDefinition {
     let options: WidgetSettingsOptions = [.period, .accounts]
 
     func makeContent(_ context: WidgetRenderContext) -> AnyView {
-        let points = context.cached("equity") { context.dashboardModel.equityPoints(for: context.filteredTrades) }
+        let points = context.cached("equity") { ChartSampling.downsample(context.dashboardModel.equityPoints(for: context.filteredTrades)) }
         return AnyView(
             EquityCurveChartView(points: points)
                 .frame(height: context.size == .large ? Theme.widgetChartHeightLarge : Theme.widgetChartHeightSmall)

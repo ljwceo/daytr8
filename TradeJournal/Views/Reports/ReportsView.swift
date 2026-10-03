@@ -14,6 +14,8 @@ struct ReportsView: View {
     @Query(sort: \Confluence.sortOrder) private var confluences: [Confluence]
 
     @State private var viewModel = ReportsViewModel()
+    /// Groeperingen per tab/filter één keer per datawijziging berekenen.
+    @State private var cache = WidgetComputationCache()
 
     private var currencyCode: String { accounts.first?.currency ?? "USD" }
 
@@ -113,9 +115,28 @@ struct ReportsView: View {
 
     // MARK: - Enkele filterset
 
+    private var dataVersion: String {
+        WidgetComputationCache.version(for: trades, extra: "\(viewModel.sortKey.rawValue)|\(viewModel.sortAscending)")
+    }
+
+    private func cachedPrimaryTrades(_ version: String) -> [Trade] {
+        cache.value("primary|\(String(describing: viewModel.primaryFilter.filterState))", version: version) { viewModel.primaryTrades(trades) }
+    }
+
+    private func cachedSecondaryTrades(_ version: String) -> [Trade] {
+        cache.value("secondary|\(String(describing: viewModel.secondaryFilter.filterState))", version: version) { viewModel.secondaryTrades(trades) }
+    }
+
+    private func cachedResults(_ side: String, filterState: DashboardFilterState, trades filtered: [Trade], version: String) -> [GroupResult] {
+        cache.value("results|\(side)|\(viewModel.selectedTab.rawValue)|\(String(describing: filterState))", version: version) {
+            viewModel.groupResults(for: viewModel.selectedTab, trades: filtered)
+        }
+    }
+
     private var singleContent: some View {
-        let filtered = viewModel.primaryTrades(trades)
-        let results = viewModel.groupResults(for: viewModel.selectedTab, trades: filtered)
+        let version = dataVersion
+        let filtered = cachedPrimaryTrades(version)
+        let results = cachedResults("A", filterState: viewModel.primaryFilter.filterState, trades: filtered, version: version)
 
         return VStack(alignment: .leading, spacing: 16) {
             card(title: "Netto P&L per \(viewModel.selectedTab.displayName.lowercased())") {
@@ -131,10 +152,11 @@ struct ReportsView: View {
     // MARK: - Vergelijkingsmodus
 
     private var compareContent: some View {
-        let primaryTrades = viewModel.primaryTrades(trades)
-        let secondaryTrades = viewModel.secondaryTrades(trades)
-        let primaryResults = viewModel.groupResults(for: viewModel.selectedTab, trades: primaryTrades)
-        let secondaryResults = viewModel.groupResults(for: viewModel.selectedTab, trades: secondaryTrades)
+        let version = dataVersion
+        let primaryTrades = cachedPrimaryTrades(version)
+        let secondaryTrades = cachedSecondaryTrades(version)
+        let primaryResults = cachedResults("A", filterState: viewModel.primaryFilter.filterState, trades: primaryTrades, version: version)
+        let secondaryResults = cachedResults("B", filterState: viewModel.secondaryFilter.filterState, trades: secondaryTrades, version: version)
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
