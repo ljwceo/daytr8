@@ -13,6 +13,23 @@ struct GoalsCardView: View {
                 .font(.headline)
                 .foregroundStyle(Theme.textPrimary)
 
+            GoalsListView(statuses: statuses)
+        }
+        .padding(Theme.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+    }
+}
+
+/// De voortgangsbalken per account zonder kaart eromheen; gedeeld door
+/// `GoalsCardView` en de doelvoortgang-widget.
+struct GoalsListView: View {
+
+    let statuses: [AccountGoalStatus]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
             ForEach(statuses) { status in
                 VStack(alignment: .leading, spacing: 10) {
                     Text(status.accountName)
@@ -49,10 +66,7 @@ struct GoalsCardView: View {
                 }
             }
         }
-        .padding(Theme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     }
 
     private func bar(title: String, value: String, fraction: Double, color: Color) -> some View {
