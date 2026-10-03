@@ -419,7 +419,7 @@ public struct MT5ScreenshotImportService {
     /// Melding als de P&L niet past bij prijsverschil en volume; `nil` = klopt
     /// of niet te beoordelen.
     func pnlMismatch(_ row: MT5ImportRow, context: ValidationContext, batchValues: [String: Double]) -> String? {
-        guard let move = signedMove(row), let pnl = row.pnl else { return nil }
+        guard let move = Self.signedMove(row), let pnl = row.pnl else { return nil }
 
         // Richting: koers ging de goede kant op maar verlies (of andersom).
         if abs(pnl) >= 1, move != 0, (pnl > 0) != (move > 0) {
