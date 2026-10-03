@@ -61,87 +61,80 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
-                Theme.background.ignoresSafeArea()
+            withDialogs(withSheets(withLifecycle(navigationContent)))
+        }
+    }
 
-                if trades.isEmpty && !layout.isEditing {
-                    PlaceholderView(
-                        title: "Dashboard",
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        subtitle: "Netto P&L, win rate, profit factor en trading score verschijnen hier zodra je trades hebt gelogd."
-                    )
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            if liveQuoteEnabled, liveQuote.symbol != nil {
-                                LiveQuoteCardView(viewModel: liveQuote)
-                            }
+    private var title: String {
+        guard let dashboard = currentDashboard, dashboards.count > 1 else { return "Dashboard" }
+        return dashboard.name
+    }
 
-                            BackupReminderBannerView()
+    // MARK: - Inhoud
 
-                            let goals = viewModel.goalStatuses(accounts: accounts, trades: trades)
-                            GoalWarningBannerView(statuses: goals)
+    private var mainContent: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
 
-                            if dashboards.count > 1 || layout.isEditing {
-                                DashboardTabsBar(
-                                    dashboards: dashboards,
-                                    selectedID: currentDashboard?.id,
-                                    isEditing: layout.isEditing,
-                                    onSelect: { layout.select($0) },
-                                    onAdd: { startNewDashboard() },
-                                    onRename: { startRename($0) },
-                                    onMove: { dashboard, offset in layout.move(dashboard, by: offset, in: modelContext) },
-                                    onDelete: { dashboardToDelete = $0 }
-                                )
-                            }
-
-                            DashboardFilterBar(
-                                viewModel: viewModel,
-                                accounts: accounts,
-                                symbols: viewModel.availableSymbols(from: trades),
-                                playbooks: playbooks,
-                                confluences: confluences
-                            )
-
-                            if layout.isEditing {
-                                editActions
-                            }
-
-                            if let dashboard = currentDashboard {
-                                widgetGrid(dashboard)
-                            }
+            if trades.isEmpty && !layout.isEditing {
+                PlaceholderView(
+                    title: "Dashboard",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    subtitle: "Netto P&L, win rate, profit factor en trading score verschijnen hier zodra je trades hebt gelogd."
+                )
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        banners
+                        if dashboards.count > 1 || layout.isEditing {
+                            tabsBar
                         }
-                        .padding(16)
-                    }
-                }
-            }
-            .navigationTitle(currentDashboard.map { dashboards.count > 1 ? $0.name : "Dashboard" } ?? "Dashboard")
-            .toolbar {
-                // Woordmerk klein boven de grote titel.
-                ToolbarItem(placement: .topBarLeading) {
-                    Daytr8LogoView(variant: .wordmark, size: 20)
-                }
-                // Medaille-overzicht.
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        rewards.openOverview()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "rosette")
-                            Text("\(rewards.unlockedCount)")
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
+                        DashboardFilterBar(
+                            viewModel: viewModel,
+                            accounts: accounts,
+                            symbols: viewModel.availableSymbols(from: trades),
+                            playbooks: playbooks,
+                            confluences: confluences
+                        )
+                        if layout.isEditing {
+                            editActions
+                        }
+                        if let dashboard = currentDashboard {
+                            widgetGrid(dashboard)
                         }
                     }
-                    .accessibilityLabel(AppStrings.Rewards.openMedalsAccessibility)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(layout.isEditing ? "Gereed" : "Bewerk") {
-                        withAnimation(.easeInOut(duration: 0.2)) { layout.isEditing.toggle() }
-                    }
-                    .fontWeight(layout.isEditing ? .semibold : .regular)
+                    .padding(16)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var banners: some View {
+        if liveQuoteEnabled, liveQuote.symbol != nil {
+            LiveQuoteCardView(viewModel: liveQuote)
+        }
+        BackupReminderBannerView()
+        GoalWarningBannerView(statuses: viewModel.goalStatuses(accounts: accounts, trades: trades))
+    }
+
+    private var tabsBar: some View {
+        DashboardTabsBar(
+            dashboards: dashboards,
+            selectedID: currentDashboard?.id,
+            isEditing: layout.isEditing,
+            onSelect: { layout.select($0) },
+            onAdd: { startNewDashboard() },
+            onRename: { startRename($0) },
+            onMove: { dashboard, offset in layout.move(dashboard, by: offset, in: modelContext) },
+            onDelete: { dashboardToDelete = $0 }
+        )
+    }
+
+    private var navigationContent: some View {
+        mainContent
+            .navigationTitle(title)
+            .toolbar { toolbarContent }
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Trade.self) { trade in
@@ -150,6 +143,40 @@ struct DashboardView: View {
             .navigationDestination(for: DashboardDayRoute.self) { route in
                 DayDetailView(date: route.date)
             }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        // Woordmerk klein boven de grote titel.
+        ToolbarItem(placement: .topBarLeading) {
+            Daytr8LogoView(variant: .wordmark, size: 20)
+        }
+        // Medaille-overzicht.
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                rewards.openOverview()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "rosette")
+                    Text("\(rewards.unlockedCount)")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
+            }
+            .accessibilityLabel(AppStrings.Rewards.openMedalsAccessibility)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(layout.isEditing ? "Gereed" : "Bewerk") {
+                withAnimation(.easeInOut(duration: 0.2)) { layout.isEditing.toggle() }
+            }
+            .fontWeight(layout.isEditing ? .semibold : .regular)
+        }
+    }
+
+    // MARK: - Modifiers
+
+    private func withLifecycle<Content: View>(_ content: Content) -> some View {
+        content
             // Filters horen bij het geopende dashboard.
             .onChange(of: viewModel.filterState) { _, state in
                 guard let dashboard = currentDashboard, loadedDashboardID == dashboard.id else { return }
@@ -180,27 +207,42 @@ struct DashboardView: View {
                     confluenceIDs: Set(confluences.map(\.id))
                 )
             }
+    }
+
+    private func withSheets<Content: View>(_ content: Content) -> some View {
+        content
             .sheet(isPresented: $showingLibrary) {
                 WidgetLibraryView(
                     previewContext: { previewContext(for: $0) },
-                    onAdd: { definition in
-                        guard let dashboard = currentDashboard else { return }
-                        layout.addWidget(definition.type, size: definition.defaultSize, settings: definition.defaultSettings, to: dashboard, in: modelContext)
-                    }
+                    onAdd: { addWidget($0) }
                 )
             }
             .sheet(item: $settingsWidget) { widget in
-                if let definition = DashboardWidgetRegistry.definition(for: widget) {
-                    WidgetSettingsSheetView(
-                        definition: definition,
-                        accounts: accounts,
-                        initialSettings: widget.settings,
-                        initialSize: widget.size,
-                        onSave: { settings, size in layout.update(widget, settings: settings, size: size, in: modelContext) },
-                        onDelete: { layout.removeWidget(widget, in: modelContext) }
-                    )
-                }
+                settingsSheet(for: widget)
             }
+    }
+
+    @ViewBuilder
+    private func settingsSheet(for widget: DashboardWidget) -> some View {
+        if let definition = DashboardWidgetRegistry.definition(for: widget) {
+            WidgetSettingsSheetView(
+                definition: definition,
+                accounts: accounts,
+                initialSettings: widget.settings,
+                initialSize: widget.size,
+                onSave: { settings, size in layout.update(widget, settings: settings, size: size, in: modelContext) },
+                onDelete: { layout.removeWidget(widget, in: modelContext) }
+            )
+        }
+    }
+
+    private func addWidget(_ definition: any DashboardWidgetDefinition) {
+        guard let dashboard = currentDashboard else { return }
+        layout.addWidget(definition.type, size: definition.defaultSize, settings: definition.defaultSettings, to: dashboard, in: modelContext)
+    }
+
+    private func withDialogs<Content: View>(_ content: Content) -> some View {
+        content
             .confirmationDialog("Widget verwijderen?", isPresented: isPresent($widgetToDelete), titleVisibility: .visible) {
                 Button("Verwijderen", role: .destructive) {
                     if let widget = widgetToDelete { layout.removeWidget(widget, in: modelContext) }
@@ -242,7 +284,6 @@ struct DashboardView: View {
                 }
                 Button("Annuleren", role: .cancel) { dashboardToRename = nil }
             }
-        }
     }
 
     // MARK: - Bewerkmodus
@@ -389,7 +430,7 @@ struct DashboardView: View {
             isTargeted: dropTargetID == widget.id,
             onDrop: { droppedID in
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    layout.drop(widgetID: droppedID, onto: widget, in: dashboard, context: modelContext)
+                    _ = layout.drop(widgetID: droppedID, onto: widget, in: dashboard, context: modelContext)
                 }
             },
             onTargetChange: { targeted in
@@ -407,13 +448,18 @@ struct DashboardView: View {
     /// Versie van de data waar widgets op rekenen; verandert zodra trades,
     /// accountdoelen, regels of journals wijzigen (dan wordt de cache geleegd).
     private var cacheVersion: String {
-        let accountKey = accounts.map { account in
-            "\(account.id)\(account.typeRaw)\(account.currency)\(account.startingBalance)\(account.monthlyProfitTarget ?? -1)\(account.dailyLossLimit ?? -1)\(account.maxDrawdown ?? -1)"
-        }.joined(separator: ",")
+        var parts: [String] = []
+        for account in accounts {
+            let goals: [Double] = [account.startingBalance, account.monthlyProfitTarget ?? -1, account.dailyLossLimit ?? -1, account.maxDrawdown ?? -1]
+            parts.append(account.id.uuidString + account.typeRaw + account.currency + goals.map { String($0) }.joined(separator: "/"))
+        }
+        for rule in rules {
+            parts.append(rule.id.uuidString + rule.kindRaw + String(rule.isActive) + String(rule.threshold))
+        }
         let journalStamp = journals.reduce(0.0) { max($0, $1.updatedAt.timeIntervalSince1970) }
-        let ruleKey = rules.map { "\($0.id)\($0.isActive)\($0.threshold)\($0.kindRaw)" }.joined(separator: ",")
-        let checksKey = "\(ruleChecks.count)-\(ruleChecks.filter(\.isFollowed).count)"
-        return WidgetComputationCache.version(for: trades, extra: "\(accountKey)|\(journals.count)-\(journalStamp)|\(ruleKey)|\(checksKey)")
+        parts.append(String(journals.count) + "-" + String(journalStamp))
+        parts.append(String(ruleChecks.count) + "-" + String(ruleChecks.filter(\.isFollowed).count))
+        return WidgetComputationCache.version(for: trades, extra: parts.joined(separator: "|"))
     }
 
     private func renderContext(
