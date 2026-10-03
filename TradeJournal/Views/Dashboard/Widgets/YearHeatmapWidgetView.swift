@@ -122,7 +122,7 @@ struct YearHeatmapWidgetView: View {
 
     private func cellSize(for grid: YearHeatmapGrid) -> CGFloat {
         let fitting = (availableWidth - Theme.heatmapLabelWidth) / CGFloat(max(grid.columnCount, 1))
-        return max(Theme.heatmapMinCellSize, fitting)
+        return min(max(Theme.heatmapMinCellSize, fitting), Theme.heatmapMaxCellSize)
     }
 
     private func heatmap(grid: YearHeatmapGrid, data: HeatmapYearData) -> some View {
@@ -207,14 +207,14 @@ struct YearHeatmapWidgetView: View {
                 ForEach(steps, id: \.self) { step in
                     Circle()
                         .fill(Theme.scaleColor(step, diverging: data.isDiverging))
-                        .frame(width: Theme.heatmapMinCellSize * Theme.heatmapDotFraction, height: Theme.heatmapMinCellSize * Theme.heatmapDotFraction)
+                        .frame(width: Theme.heatmapLegendDotSize, height: Theme.heatmapLegendDotSize)
                 }
             }
             Text(legendHigh(data))
             Spacer(minLength: 8)
             Circle()
                 .fill(Theme.heatmapEmpty)
-                .frame(width: Theme.heatmapMinCellSize * Theme.heatmapDotFraction, height: Theme.heatmapMinCellSize * Theme.heatmapDotFraction)
+                .frame(width: Theme.heatmapLegendDotSize, height: Theme.heatmapLegendDotSize)
             Text("Geen trades")
         }
         .font(.caption2)

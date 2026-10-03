@@ -92,7 +92,7 @@ struct DashboardView: View {
                         DashboardFilterBar(
                             viewModel: viewModel,
                             accounts: accounts,
-                            symbols: viewModel.availableSymbols(from: trades),
+                            symbols: cache.value("dashboard|symbols", version: cacheVersion) { viewModel.availableSymbols(from: trades) },
                             playbooks: playbooks,
                             confluences: confluences
                         )
@@ -115,7 +115,9 @@ struct DashboardView: View {
             LiveQuoteCardView(viewModel: liveQuote)
         }
         BackupReminderBannerView()
-        GoalWarningBannerView(statuses: viewModel.goalStatuses(accounts: accounts, trades: trades))
+        GoalWarningBannerView(statuses: cache.value("dashboard|goals", version: cacheVersion) {
+            viewModel.goalStatuses(accounts: accounts, trades: trades)
+        })
     }
 
     private var tabsBar: some View {
@@ -475,6 +477,7 @@ struct DashboardView: View {
             widgetID: widgetID,
             size: size,
             settings: settings,
+            settingsKey: settings.jsonString,
             allTrades: trades,
             accounts: accounts,
             rules: rules,

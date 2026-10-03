@@ -82,9 +82,13 @@ enum Theme {
     /// Breedte van het voorbeeld van een kleine widget in de bibliotheek.
     static let widgetSmallPreviewWidth: CGFloat = 220
 
-    /// Minimale celgrootte (stip + marge) van de jaar-heatmap; past het jaar
-    /// niet in de breedte, dan scrolt de heatmap horizontaal.
-    static let heatmapMinCellSize: CGFloat = 12
+    /// Celgrootte (stip + marge) van de jaar-heatmap: het hele jaar past in de
+    /// breedte; pas onder de minimale grootte scrolt de heatmap horizontaal.
+    static let heatmapMinCellSize: CGFloat = 4.5
+    static let heatmapMaxCellSize: CGFloat = 18
+
+    /// Stip in de legenda van de heatmap.
+    static let heatmapLegendDotSize: CGFloat = 9
 
     /// Stipdiameter als deel van de cel.
     static let heatmapDotFraction: CGFloat = 0.78

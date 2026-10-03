@@ -325,6 +325,57 @@ public struct WidgetDataService: Sendable {
     }
 }
 
+/// Maakt tijdreeksen geschikt voor een grafiek met veel punten.
+public enum ChartSampling {
+
+    /// Maximaal aantal punten in een lijngrafiek; meer is niet zichtbaar en
+    /// maakt Swift Charts traag.
+    public static let defaultMaxPoints = 300
+
+    /// Eén punt per tijdstip (bij gelijke datum telt het laatste), daarna
+    /// teruggebracht tot hooguit `maxPoints` door per bak het laagste en het
+    /// hoogste punt te houden — pieken en dalen blijven zo zichtbaar.
+    /// Strikt oplopende datums voorkomen ook de vreemde uitschieters van
+    /// `.monotone`-interpolatie bij dubbele x-waarden.
+    public static func downsample(_ points: [DateValuePoint], maxPoints: Int = defaultMaxPoints) -> [DateValuePoint] {
+        var unique: [DateValuePoint] = []
+        unique.reserveCapacity(points.count)
+        let ordered = points.enumerated().sorted { lhs, rhs in
+            lhs.element.date != rhs.element.date ? lhs.element.date < rhs.element.date : lhs.offset < rhs.offset
+        }.map(\.element)
+        for point in ordered {
+            if let last = unique.last, last.date == point.date {
+                unique[unique.count - 1] = point
+            } else {
+                unique.append(point)
+            }
+        }
+        guard maxPoints >= 4, unique.count > maxPoints else { return unique }
+
+        let bucketCount = maxPoints / 2
+        let bucketSize = Double(unique.count) / Double(bucketCount)
+        var result: [DateValuePoint] = []
+        result.reserveCapacity(maxPoints + 2)
+        for bucket in 0..<bucketCount {
+            let start = Int((Double(bucket) * bucketSize).rounded(.down))
+            let end = min(Int((Double(bucket + 1) * bucketSize).rounded(.down)), unique.count)
+            guard start < end else { continue }
+            let slice = unique[start..<end]
+            guard let low = slice.min(by: { $0.value < $1.value }),
+                  let high = slice.max(by: { $0.value < $1.value }) else { continue }
+            if low.date == high.date {
+                result.append(low)
+            } else {
+                result.append(contentsOf: low.date < high.date ? [low, high] : [high, low])
+            }
+        }
+        // Begin- en eindpunt altijd exact.
+        if let first = unique.first, result.first?.date != first.date { result.insert(first, at: 0) }
+        if let last = unique.last, result.last?.date != last.date { result.append(last) }
+        return result
+    }
+}
+
 /// Eenvoudige cache voor widgetberekeningen tussen renders.
 ///
 /// Elke widget rekent op dezelfde tradelijst; zolang die niet verandert
@@ -343,7 +394,9 @@ public final class WidgetComputationCache {
             storage.removeAll(keepingCapacity: true)
             self.version = version
         }
-        if let cached = storage[key] as? T { return cached }
+        // Eerst op de sleutel controleren: `nil as? Optional<X>` slaagt in
+        // Swift, waardoor een optioneel resultaat anders nooit berekend werd.
+        if let entry = storage[key], let cached = entry as? T { return cached }
         let value = compute()
         storage[key] = value
         return value
