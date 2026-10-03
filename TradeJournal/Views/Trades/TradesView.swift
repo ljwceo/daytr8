@@ -11,13 +11,19 @@ struct TradesView: View {
 
     @Query(sort: \Trade.entryDate, order: .reverse) private var trades: [Trade]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
+    @Query private var importMarks: [TradeImportMark]
 
     @State private var viewModel = TradesListViewModel()
     @State private var showingNewTrade = false
+    @State private var showingMT5Import = false
     @State private var tradeToDelete: Trade?
 
+    private var quickAddedIDs: Set<UUID> {
+        MT5ScreenshotImportService.markedTradeIDs(importMarks)
+    }
+
     private var visibleTrades: [Trade] {
-        viewModel.filteredAndSorted(trades)
+        viewModel.filteredAndSorted(trades, quickAddedIDs: quickAddedIDs)
     }
 
     var body: some View {
@@ -35,9 +41,10 @@ struct TradesView: View {
                     List {
                         quickFilterRow
 
+                        let marked = quickAddedIDs
                         ForEach(visibleTrades) { trade in
                             NavigationLink(value: trade) {
-                                TradeRowView(trade: trade, metrics: viewModel.metrics(for: trade))
+                                TradeRowView(trade: trade, metrics: viewModel.metrics(for: trade), isQuickAdded: marked.contains(trade.id))
                             }
                             .listRowBackground(Theme.card)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -85,6 +92,14 @@ struct TradesView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        showingMT5Import = true
+                    } label: {
+                        Image(systemName: "text.viewfinder")
+                    }
+                    .accessibilityLabel("Trades importeren vanaf MT5-screenshots")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         showingNewTrade = true
                     } label: {
                         Image(systemName: "plus")
@@ -98,6 +113,9 @@ struct TradesView: View {
             .onChange(of: onboarding.isNewTradeRequested) { _, _ in openRequestedNewTrade() }
             .sheet(isPresented: $showingNewTrade) {
                 TradeFormView(mode: .create, lastTrade: trades.first, fallbackAccount: accounts.first)
+            }
+            .sheet(isPresented: $showingMT5Import) {
+                MT5ImportView(onShowQuickAdded: { viewModel.quickFilter = .quickAdded })
             }
             .confirmationDialog(
                 "Trade verwijderen?",

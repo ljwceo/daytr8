@@ -316,8 +316,12 @@ public struct TradeEditingService {
     }
 
     /// Verwijdert een trade. Executions, screenshots en rule-adherence gaan
-    /// mee via hun cascade-`deleteRule`.
+    /// mee via hun cascade-`deleteRule`; een markering "snel toegevoegd"
+    /// (`TradeImportMark`, zonder relatie) wordt los opgeruimd.
     public func delete(_ trade: Trade, from context: ModelContext) {
+        let tradeID = trade.id
+        let marks = (try? context.fetch(FetchDescriptor<TradeImportMark>(predicate: #Predicate { $0.tradeID == tradeID }))) ?? []
+        for mark in marks { context.delete(mark) }
         context.delete(trade)
     }
 

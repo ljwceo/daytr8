@@ -174,3 +174,76 @@ mogelijk velden automatisch invult. Volledig on-device, offline, geen cloud.
   met alleen de screenshot al bijgevoegd en een nette melding.
 - Unit tests: parser-tests met een paar voorbeeld-OCR-outputs (als tekstfixtures) per
   broker-template, zodat de regexen niet stilletjes stukgaan.
+
+## 13. Aanpasbaar dashboard met widgets
+- Het dashboard is een widget-systeem: widgets toevoegen, verwijderen, herordenen via
+  drag & drop en van grootte wisselen (klein = halve breedte, groot = volle breedte).
+- Bewerkmodus met een knop "Widget toevoegen" die een bibliotheek opent met een
+  voorbeeldweergave per widget.
+- Meerdere dashboards/tabbladen die de gebruiker zelf aanmaakt en benoemt (bijv.
+  "Overzicht", "Prop firm", "Backtest"), elk met eigen widgets en filters.
+- Elke widget heeft eigen instellingen: periode (week/maand/jaar/alles/custom, of zoals het
+  dashboard), account(s) en waar relevant een dimensie (per symbool, sessie, confluence,
+  playbook) of kengetal.
+- Model: `Dashboard` (naam, volgorde, filters, widgets) en `DashboardWidget` (type, grootte,
+  volgorde, instellingen als JSON) in SwiftData, mee in de backup en restore; een oude
+  backup zonder dashboards blijft terug te zetten (de huidige indeling blijft dan staan).
+- Uitbreidbaar: één protocol/registry (`DashboardWidgetDefinition` /
+  `DashboardWidgetRegistry`) waarin elk widgettype zich aanmeldt met naam, icoon,
+  standaardgrootte, ondersteunde groottes en instellingenscherm.
+- Widgetbibliotheek (minimaal):
+  - Jaar-heatmap: maanden horizontaal, dagen van de week verticaal, één ronde stip per dag,
+    legenda met kleurschaal onderaan, groot jaartal linksboven en een samenvattend getal
+    rechtsboven. Instelbaar wat de kleur toont: netto P&L, aantal trades, win rate of
+    behaalde R. Tik op een stip opent het dagdetail. Kleuren uit het actieve thema. Soepel
+    met meerdere jaren data.
+  - Statistiekkaart met één kengetal naar keuze (netto P&L, win rate, profit factor,
+    expectancy, avg R, max drawdown, aantal trades, streak, …) plus verandering t.o.v. de
+    vorige periode.
+  - Equity curve, dagelijkse P&L bars, drawdown chart.
+  - Mini-kalender van de huidige maand.
+  - Top/flop-lijst: beste en slechtste symbolen, confluences, playbooks of sessies.
+  - Histogram van R-multiples.
+  - Doelvoortgang (maanddoel of prop firm-limieten).
+  - Regels/consistentie-streak.
+  - Recente trades.
+  - Vrije notitiewidget.
+  - Backup-status.
+  - Trading score (radar).
+- Standaardindeling bij de eerste start (dezelfde kaarten als het vaste dashboard van
+  daarvoor, plus de jaar-heatmap) en een knop "Herstel standaardindeling".
+- Datamodelwijzigingen via een nieuwe SwiftData-schemaversie met migratiestap
+  (`AppSchemaV2`, lichtgewicht vanaf de bevroren `AppSchemaV1`); bestaande data blijft intact.
+
+## 14. Bulk-import via MT5-screenshot
+Doel: in één keer tot ~20 trades toevoegen vanaf screenshots van de MetaTrader 5-geschiedenis.
+Alleen de harde cijfers: symbool, richting, volume, entry, exit, sluittijd en P&L. Geen
+confluences, playbook, tags of notities; die vult de gebruiker later per trade aan.
+
+- Ondersteunt ALLEEN het MetaTrader 5-formaat (iOS-app, History-tab, donkere modus).
+- Formaat per trade: regel 1 heeft symbool (AUDCAD, XAUUSD), richting (buy/sell) en volume,
+  met de P&L rechts; regel 2 heeft entry-prijs → exit-prijs en rechts de sluitdatum en -tijd
+  in formaat YYYY.MM.DD HH:MM:SS.
+- Parser-eisen: richting uit het woord buy/sell, nooit uit de kleur. Spatie als
+  duizendtalscheiding ("-1 270.65", ook als non-breaking space) en punt als decimaalteken.
+  Correct omgaan met negatieve bedragen, XAUUSD met vier cijfers vóór de komma en
+  forexparen met vijf decimalen.
+- Meerdere screenshots tegelijk selecteren (bij doorscrollen); resultaten samenvoegen met
+  duplicaatdetectie op symbool + sluittijd + prijzen, ook tegen al bestaande trades.
+- OCR volledig lokaal met Vision (`VNRecognizeTextRequest`, accurate mode). Geen netwerk,
+  geen externe dienst, geen extra entitlements.
+- Verplicht controlescherm na de OCR: bewerkbare tabel met alle herkende trades, per veld
+  corrigeerbaar, regels aan/uit te vinken en te verwijderen. Gemarkeerd: velden met lage
+  OCR-zekerheid of die niet kloppen (P&L past niet bij prijsverschil en volume, onbekend
+  symbool, datum in de toekomst). Pas na "Importeren" wordt er opgeslagen.
+- In het controlescherm in één handeling voor alle geselecteerde trades het account
+  instellen, en optioneel één playbook of tag.
+- De screenshot wordt als bijlage aan de geïmporteerde trades gekoppeld.
+- Geïmporteerde trades krijgen de markering "snel toegevoegd", met een filter daarop in het
+  trade log.
+- Samenvatting na afloop: hoeveel geïmporteerd, hoeveel overgeslagen als duplicaat, hoeveel
+  handmatig gecorrigeerd.
+- Parser los van de UI in een eigen, testbare service (invoer: herkende tekstregels met
+  posities), met unit tests op realistische MT5-regels en randgevallen.
+- De import slaat nooit stilletjes verkeerde data op: bij twijfel markeren en voorleggen,
+  niet gokken.

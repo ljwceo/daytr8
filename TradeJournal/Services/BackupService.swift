@@ -91,6 +91,8 @@ public struct BackupService {
         let templates = fetch(JournalTemplate.self, in: context)
         let dailyRules = fetch(DailyRule.self, in: context)
         let notes = fetch(NotebookNote.self, in: context)
+        let dashboards = fetch(Dashboard.self, in: context)
+        let importMarks = fetch(TradeImportMark.self, in: context)
 
         var tradeDTOs: [BackupPayload.TradeDTO] = []
         tradeDTOs.reserveCapacity(trades.count)
@@ -207,6 +209,11 @@ public struct BackupService {
         payload.journalTemplates = templateDTOs
         payload.dailyRules = ruleDTOs
         payload.notebookNotes = noteDTOs
+        payload.dashboards = dashboards.map(Self.dto(for:))
+        let tradeIDs = Set(trades.map(\.id))
+        payload.tradeImportMarks = importMarks
+            .filter { tradeIDs.contains($0.tradeID) }
+            .map { BackupPayload.TradeImportMarkDTO(id: $0.id, tradeID: $0.tradeID, source: $0.sourceRaw, importedAt: $0.importedAt) }
         payload.settings = settingsDefaults.map { SettingsMigrator.snapshot(from: $0) }
 
         try writer.addFile(path: Self.payloadPath, data: try Self.encoder.encode(payload), compress: true)
@@ -410,6 +417,12 @@ public struct BackupService {
         }
 
         restoreFormatVersion2(payload, trades: tradesByID, into: context)
+        restoreDashboards(payload.dashboards, into: context)
+        for dto in payload.tradeImportMarks ?? [] where tradesByID[dto.tradeID] != nil {
+            let mark = TradeImportMark(id: dto.id, tradeID: dto.tradeID, importedAt: dto.importedAt)
+            mark.sourceRaw = dto.source
+            context.insert(mark)
+        }
 
         try context.save()
 
@@ -460,7 +473,45 @@ public struct BackupService {
         }
     }
 
+    /// Dashboards uit de backup vervangen de huidige. Een backup zonder
+    /// dashboards (van vóór het aanpasbare dashboard) laat de huidige
+    /// indeling staan; `wipeAll` raakt dashboards niet aan.
+    private func restoreDashboards(_ dtos: [BackupPayload.DashboardDTO]?, into context: ModelContext) {
+        guard let dtos, !dtos.isEmpty else { return }
+        for existing in fetch(Dashboard.self, in: context) {
+            context.delete(existing)
+        }
+        for dto in dtos {
+            let dashboard = Dashboard(id: dto.id, name: dto.name, sortOrder: dto.sortOrder, createdAt: dto.createdAt, filtersJSON: dto.filters)
+            context.insert(dashboard)
+            var widgets: [DashboardWidget] = []
+            for item in dto.widgets {
+                let widget = DashboardWidget(
+                    id: item.id, typeRaw: item.type, sizeRaw: item.size,
+                    sortOrder: item.sortOrder, settingsJSON: item.settings, createdAt: item.createdAt
+                )
+                context.insert(widget)
+                widget.dashboard = dashboard
+                widgets.append(widget)
+            }
+            dashboard.widgets = widgets
+        }
+    }
+
     // MARK: - Helpers
+
+    static func dto(for dashboard: Dashboard) -> BackupPayload.DashboardDTO {
+        let widgets: [BackupPayload.DashboardWidgetDTO] = dashboard.sortedWidgets.map { widget in
+            BackupPayload.DashboardWidgetDTO(
+                id: widget.id, type: widget.typeRaw, size: widget.sizeRaw,
+                sortOrder: widget.sortOrder, settings: widget.settingsJSON, createdAt: widget.createdAt
+            )
+        }
+        return BackupPayload.DashboardDTO(
+            id: dashboard.id, name: dashboard.name, sortOrder: dashboard.sortOrder,
+            createdAt: dashboard.createdAt, filters: dashboard.filtersJSON, widgets: widgets
+        )
+    }
 
     private func image(named fileName: String, in reader: BackupArchive) -> Data? {
         // Alleen platte bestandsnamen binnen images/ accepteren.

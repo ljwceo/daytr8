@@ -40,6 +40,7 @@ struct MoreView: View {
 
     @State private var isBusy = false
     @State private var showingCSVImport = false
+    @State private var showingMT5Import = false
     @State private var confirmWipe = false
     @State private var lastMessage: String? = nil
 
@@ -136,6 +137,12 @@ struct MoreView: View {
                         } label: {
                             Label("CSV importeren", systemImage: "square.and.arrow.down.on.square")
                         }
+
+                        Button {
+                            showingMT5Import = true
+                        } label: {
+                            Label("MT5-screenshots importeren", systemImage: "text.viewfinder")
+                        }
                     }
 
                     collapsible(.debug) {
@@ -183,6 +190,9 @@ struct MoreView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingCSVImport) {
                 CSVImportView()
+            }
+            .sheet(isPresented: $showingMT5Import) {
+                MT5ImportView()
             }
             // Resultaat van een debug-actie als pop-up: onderaan de lijst viel
             // de melding buiten beeld.

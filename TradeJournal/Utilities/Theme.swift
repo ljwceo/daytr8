@@ -70,6 +70,46 @@ enum Theme {
     /// Standaard binnenmarge voor kaarten.
     static let cardPadding: CGFloat = 16
 
+    // MARK: - Dashboard-widgets
+
+    /// Ruimte tussen widgets in het dashboardraster.
+    static let widgetSpacing: CGFloat = 12
+
+    /// Hoogte van een grafiek in een grote / kleine widget.
+    static let widgetChartHeightLarge: CGFloat = 170
+    static let widgetChartHeightSmall: CGFloat = 110
+
+    /// Breedte van het voorbeeld van een kleine widget in de bibliotheek.
+    static let widgetSmallPreviewWidth: CGFloat = 220
+
+    /// Minimale celgrootte (stip + marge) van de jaar-heatmap; past het jaar
+    /// niet in de breedte, dan scrolt de heatmap horizontaal.
+    static let heatmapMinCellSize: CGFloat = 12
+
+    /// Stipdiameter als deel van de cel.
+    static let heatmapDotFraction: CGFloat = 0.78
+
+    /// Breedte van de kolom met weekdaglabels links van de heatmap.
+    static let heatmapLabelWidth: CGFloat = 16
+
+    /// Kleur van een dag/waarde in een heatmap of schaal, afgeleid van de
+    /// themakleuren (dus correct in elk thema, ook eigen thema's).
+    /// - Parameters:
+    ///   - normalized: -1…1 (uitwaaierend: verlies → winst) of 0…1 (aantal).
+    ///   - diverging: `true` = verlies/winst-kleuren, `false` = accent-schaal.
+    static func scaleColor(_ normalized: Double, diverging: Bool) -> Color {
+        let magnitude = min(abs(normalized), 1)
+        if diverging {
+            if normalized > 0 { return profit.opacity(0.3 + 0.7 * magnitude) }
+            if normalized < 0 { return loss.opacity(0.3 + 0.7 * magnitude) }
+            return neutral.opacity(0.6)
+        }
+        return accent.opacity(0.25 + 0.75 * magnitude)
+    }
+
+    /// Dag zonder data in een heatmap.
+    static var heatmapEmpty: Color { separator }
+
     // MARK: - Rewards
 
     /// Materiaalverloop (licht → donker) van een medaille. Vast per materiaal

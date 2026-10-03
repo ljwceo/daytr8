@@ -7,6 +7,8 @@ struct TradeRowView: View {
 
     let trade: Trade
     let metrics: TradeMetrics
+    /// Markering "snel toegevoegd" (MT5-import, nog aan te vullen).
+    var isQuickAdded = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -18,9 +20,14 @@ struct TradeRowView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(trade.symbol)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
+                HStack(spacing: 6) {
+                    Text(trade.symbol)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    if isQuickAdded {
+                        QuickAddedBadgeView()
+                    }
+                }
                 HStack(spacing: 6) {
                     Text(trade.entryDate.formatted(date: .abbreviated, time: .shortened))
                     Text("·")
@@ -54,5 +61,19 @@ struct TradeRowView: View {
 
     private var rowColor: Color {
         metrics.outcome == .open ? Theme.neutral : Theme.color(forPnL: metrics.netPnL)
+    }
+}
+
+/// Kleine badge "Snel" voor trades uit de MT5-screenshotimport.
+struct QuickAddedBadgeView: View {
+    var body: some View {
+        Text("Snel")
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .foregroundStyle(Theme.warning)
+            .background(Theme.warning.opacity(0.15))
+            .clipShape(Capsule())
+            .accessibilityLabel("Snel toegevoegd")
     }
 }

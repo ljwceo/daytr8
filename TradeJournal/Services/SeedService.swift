@@ -27,6 +27,7 @@ public enum SeedService {
         seedConfluencesIfNeeded(in: context)
         seedJournalTemplatesIfNeeded(in: context)
         seedDailyRulesIfNeeded(in: context)
+        seedDashboardsIfNeeded(in: context, defaults: defaults)
 
         do {
             try context.save()
@@ -138,6 +139,16 @@ public enum SeedService {
         for (index, def) in defaultDailyRules.enumerated() {
             context.insert(DailyRule(name: def.name, kind: def.kind, threshold: def.threshold, sortOrder: index, createdAt: now))
         }
+    }
+
+    // MARK: - Dashboard
+
+    /// Standaardindeling van het dashboard, alleen als er nog geen enkel
+    /// dashboard is (eerste start, of de eerste start na de update naar het
+    /// aanpasbare dashboard). De filters van het oude, vaste dashboard
+    /// (`DashboardFilterSettings`) gaan mee naar het standaarddashboard.
+    public static func seedDashboardsIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
+        DashboardLayoutService().ensureDefaultDashboard(in: context, initialFilters: DashboardFilterSettings(defaults: defaults).load())
     }
 
     // MARK: - Helper

@@ -44,6 +44,15 @@ public struct BackupPayload: Codable, Equatable {
     /// bij backups van vóór deze versie (`nil` → instellingen blijven staan).
     public var settings: [String: SettingValue]? = nil
 
+    /// Dashboards met hun widgets (aanpasbaar dashboard). Optioneel: ontbreekt
+    /// bij oudere backups (`nil` → de huidige dashboards blijven staan) en
+    /// wordt door oudere app-versies genegeerd, dus geen nieuwe `formatVersion`.
+    public var dashboards: [DashboardDTO]? = nil
+
+    /// Markeringen "snel toegevoegd" (MT5-screenshotimport). Optioneel, zelfde
+    /// regels als `dashboards`; ontbreekt → geen trades gemarkeerd.
+    public var tradeImportMarks: [TradeImportMarkDTO]? = nil
+
     // MARK: - DTO's
 
     public struct AccountDTO: Codable, Equatable {
@@ -227,6 +236,35 @@ public struct BackupPayload: Codable, Equatable {
         public var sortOrder: Int
         public var createdAt: Date
         public var checks: [DailyRuleCheckDTO]
+    }
+
+    /// Widget op een dashboard. Type, grootte en instellingen als ruwe tekst,
+    /// zodat ook onbekende types (nieuwere app-versie) heel blijven.
+    public struct DashboardWidgetDTO: Codable, Equatable {
+        public var id: UUID
+        public var type: String
+        public var size: String
+        public var sortOrder: Int
+        /// `WidgetSettings` als JSON-tekst.
+        public var settings: String
+        public var createdAt: Date
+    }
+
+    public struct DashboardDTO: Codable, Equatable {
+        public var id: UUID
+        public var name: String
+        public var sortOrder: Int
+        public var createdAt: Date
+        /// `DashboardFilterState` als JSON-tekst (leeg = geen filters).
+        public var filters: String
+        public var widgets: [DashboardWidgetDTO]
+    }
+
+    public struct TradeImportMarkDTO: Codable, Equatable {
+        public var id: UUID
+        public var tradeID: UUID
+        public var source: String
+        public var importedAt: Date
     }
 
     public struct NotebookNoteDTO: Codable, Equatable {

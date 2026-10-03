@@ -135,6 +135,18 @@ Regels:
   `AppMigrationPlan` (`Models/AppSchema.swift`). Een model wijzigen op een
   manier die SwiftData niet zelf kan migreren? Voeg een nieuwe
   `AppSchemaVn` + `MigrationStage` toe; nooit de store-locatie wijzigen.
+  `AppSchema.v1Models` is bevroren (zo wordt een oude store herkend);
+  nieuwe modellen gaan in `AppSchema.models` (= de nieuwste versie, nu V2).
+  Een bestaand model wijzigen vraagt een geneste kopie van de oude types in
+  een nieuwe versie; liever een nieuw model naast het bestaande (zoals
+  `TradeImportMark` naast `Trade`).
+- Dashboard: dashboards/widgets via `Services/DashboardLayoutService.swift`;
+  widgetcijfers via `Services/WidgetDataService.swift` (die filtert met
+  `DashboardViewModel` en rekent met `StatsService`). Nieuw widgettype = case
+  in `DashboardWidgetType` + struct die `DashboardWidgetDefinition` volgt +
+  regel in `DashboardWidgetRegistry` (`Views/Dashboard/Widgets/`).
+- Nieuw model dat in de backup hoort: optioneel veld in `BackupPayload`
+  (`nil` bij oude backups) + export en restore in `BackupService`.
 - Instellingen in `UserDefaults`: sleutel hernoemen of waardevorm wijzigen →
   migratie in `Services/SettingsMigrator.swift`; nieuwe instelling die in de
   backup hoort → `SettingsMigrator.backedUpKeys`.

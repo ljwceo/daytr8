@@ -73,7 +73,7 @@ public struct ScreenshotParser: Sendable {
     /// Parseert Vision-blokken met positie: eerst als tabel, anders als
     /// label-waarde-tekst.
     public func parse(boxes: [RecognizedTextBox], referenceDate: Date = Date()) -> ScreenshotParseResult {
-        let normalized = boxes.map { RecognizedTextBox(text: Self.normalize($0.text), boundingBox: $0.boundingBox) }
+        let normalized = boxes.map { RecognizedTextBox(text: Self.normalize($0.text), boundingBox: $0.boundingBox, confidence: $0.confidence) }
         let text = ScreenshotLineBuilder.lines(from: normalized).joined(separator: "\n")
         let broker = detectBroker(in: text)
 
