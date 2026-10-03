@@ -99,6 +99,19 @@ public struct AutoBackupService {
         guard let folder = resolveFolder() else { throw AutoBackupError.folderUnavailable }
 
         let temporary = try backupService.exportBackup(from: context, fileNamePrefix: Self.fileNamePrefix, now: now)
+        let destination = try Self.store(temporary, in: folder, keep: settings.autoBackupKeepCount)
+
+        settings.recordBackup(at: now, automatic: true)
+        return destination
+    }
+
+    // MARK: - Opslaan in de map (ook vanaf de achtergrond)
+
+    /// Kopieert een tijdelijke backup naar de gekozen map (binnen de security
+    /// scope), ruimt oude automatische backups op en verwijdert de tijdelijke
+    /// kopie. Raakt geen SwiftData of `BackupSettings` aan, zodat
+    /// `BackupExportActor` hem buiten de main thread kan aanroepen.
+    static func store(_ temporary: URL, in folder: URL, keep: Int) throws -> URL {
         defer { try? FileManager.default.removeItem(at: temporary) }
 
         let didAccess = folder.startAccessingSecurityScopedResource()
@@ -106,9 +119,7 @@ public struct AutoBackupService {
 
         let destination = folder.appendingPathComponent(temporary.lastPathComponent)
         try copyCoordinated(from: temporary, to: destination)
-        pruneOldBackups(in: folder, keep: settings.autoBackupKeepCount)
-
-        settings.recordBackup(at: now, automatic: true)
+        pruneOldBackups(in: folder, keep: keep)
         return destination
     }
 
@@ -116,7 +127,7 @@ public struct AutoBackupService {
 
     /// Kopieert via `NSFileCoordinator`, zodat providers als iCloud Drive
     /// correct op de hoogte zijn van de schrijfactie.
-    private func copyCoordinated(from source: URL, to destination: URL) throws {
+    private static func copyCoordinated(from source: URL, to destination: URL) throws {
         var coordinatorError: NSError?
         var copyError: Error?
         NSFileCoordinator().coordinate(writingItemAt: destination, options: .forReplacing, error: &coordinatorError) { url in
@@ -135,8 +146,8 @@ public struct AutoBackupService {
 
     /// Verwijdert de oudste automatische backups boven `keep`. Bestandsnamen
     /// bevatten een sorteerbare timestamp, dus alfabetisch = chronologisch.
-    func pruneOldBackups(in folder: URL, keep: Int) {
-        let names = Self.backupsToPrune(
+    static func pruneOldBackups(in folder: URL, keep: Int) {
+        let names = backupsToPrune(
             fileNames: (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [],
             keep: keep
         )

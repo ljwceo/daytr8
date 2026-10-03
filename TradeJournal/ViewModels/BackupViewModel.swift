@@ -25,6 +25,9 @@ public struct ShareableFile: Identifiable, Equatable {
 public final class BackupViewModel {
 
     public var isWorking = false
+    /// Tekst bij de voortgangsindicator terwijl een backup op de achtergrond
+    /// gemaakt wordt (`nil` = geen tekst).
+    public private(set) var progressMessage: String?
     public var statusMessage: String?
     public var errorMessage: String?
 
@@ -94,6 +97,27 @@ public final class BackupViewModel {
         perform {
             let url = try self.backupService.exportBackup(from: context)
             self.present(ShareableFile(url: url, kind: .backup))
+        }
+    }
+
+    /// Maakt de backup buiten de main thread (eigen `ModelContext` op
+    /// `container`) en toont daarna de share sheet. De view toont zolang een
+    /// voortgangsindicator.
+    public func createBackup(in container: ModelContainer) async {
+        guard !isWorking else { return }
+        isWorking = true
+        progressMessage = "Backup maken…"
+        errorMessage = nil
+        statusMessage = nil
+        defer {
+            isWorking = false
+            progressMessage = nil
+        }
+        do {
+            let url = try await BackupExportActor.exportInBackground(container: container, service: backupService)
+            present(ShareableFile(url: url, kind: .backup))
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -272,6 +296,51 @@ public final class BackupViewModel {
             let backup = try self.autoBackupService.runNow(context: context)
             self.statusMessage = "Backupmap ingesteld: \(url.lastPathComponent). Eerste backup opgeslagen als \(backup.lastPathComponent)."
         }
+    }
+
+    /// Als `setAutoBackupFolder(_:context:)`, maar de eerste backup loopt op
+    /// de achtergrond via `coordinator` (nooit twee tegelijk).
+    func setAutoBackupFolder(_ url: URL, coordinator: BackupCoordinator, container: ModelContainer) async {
+        diagnostics.record("Backupmap gekozen", detail: url.lastPathComponent)
+        errorMessage = nil
+        statusMessage = nil
+        do {
+            try autoBackupService.setFolder(url)
+            if autoBackupFrequency == .off {
+                setAutoBackupFrequency(.daily)
+            }
+            refreshFromSettings()
+            let backup = try await runInBackground { try await coordinator.runAutoBackupNow(container: container) }
+            statusMessage = "Backupmap ingesteld: \(url.lastPathComponent). Eerste backup opgeslagen als \(backup.lastPathComponent)."
+        } catch {
+            errorMessage = error.localizedDescription
+            diagnostics.record("Fout bij instellen backupmap", detail: error.localizedDescription)
+        }
+        refreshFromSettings()
+    }
+
+    /// "Nu backuppen naar map" op de achtergrond via `coordinator`.
+    func runAutoBackupNow(coordinator: BackupCoordinator, container: ModelContainer) async {
+        errorMessage = nil
+        statusMessage = nil
+        do {
+            let url = try await runInBackground { try await coordinator.runAutoBackupNow(container: container) }
+            statusMessage = "Backup opgeslagen als \(url.lastPathComponent)."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        refreshFromSettings()
+    }
+
+    /// Busy-state met voortgangstekst rond een achtergrondbackup.
+    private func runInBackground<T>(_ work: () async throws -> T) async throws -> T {
+        isWorking = true
+        progressMessage = "Backup maken…"
+        defer {
+            isWorking = false
+            progressMessage = nil
+        }
+        return try await work()
     }
 
     public func clearAutoBackupFolder() {

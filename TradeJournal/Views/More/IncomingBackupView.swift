@@ -10,6 +10,8 @@ struct IncomingBackupView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    /// Lopende automatische backup eerst laten afronden vóór een restore.
+    @Environment(BackupCoordinator.self) private var backupCoordinator: BackupCoordinator?
 
     @State private var viewModel = BackupViewModel()
     @State private var hasLoaded = false
@@ -115,7 +117,10 @@ struct IncomingBackupView: View {
             titleVisibility: .visible
         ) {
             Button("Wis huidige data en herstel", role: .destructive) {
-                viewModel.confirmRestore(into: modelContext)
+                Task {
+                    await backupCoordinator?.waitForRunningBackup()
+                    viewModel.confirmRestore(into: modelContext)
+                }
             }
             Button("Annuleren", role: .cancel) {}
         } message: {

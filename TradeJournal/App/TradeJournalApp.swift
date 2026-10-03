@@ -35,6 +35,10 @@ struct TradeJournalApp: App {
     /// Backups die via de Bestanden-app of het deelmenu binnenkomen.
     @State private var incomingFiles = IncomingFileRouter()
 
+    /// Automatische (en handmatige) backups op de achtergrond; nooit twee
+    /// automatische tegelijk.
+    @State private var backupCoordinator = BackupCoordinator()
+
     /// Laadscherm met het woordmerk tot de start-taken klaar zijn.
     @State private var isSplashVisible = true
 
@@ -56,6 +60,7 @@ struct TradeJournalApp: App {
                 .environment(onboarding)
                 .environment(rewards)
                 .environment(incomingFiles)
+                .environment(backupCoordinator)
                 // "Deel → Daytr8" / "Open in" vanuit Bestanden: iOS levert een
                 // kopie in Documents/Inbox; RootTabView toont hem als sheet.
                 .onOpenURL { url in
@@ -67,8 +72,9 @@ struct TradeJournalApp: App {
                     // Idempotente seed van standaardconfluences en instrumentpresets
                     // bij de eerste app-start. Loopt op de main-actor (task in body).
                     SeedService.seedDefaultsIfNeeded(in: container.mainContext)
-                    // Automatische backup naar de gekozen map (als ingesteld).
-                    AutoBackupService().runIfDue(context: container.mainContext, isLaunch: true)
+                    // Automatische backup naar de gekozen map (als ingesteld),
+                    // op de achtergrond: de start wacht er niet op.
+                    Task { await backupCoordinator.runAutoBackupIfDue(container: container, isLaunch: true) }
                     // Medailles (achteraf) berekenen; de eerste keer stil, met
                     // hooguit één samenvatting.
                     rewards.sync(in: container.mainContext)
@@ -86,8 +92,9 @@ struct TradeJournalApp: App {
                         appLock.didEnterBackground()
                     case .active:
                         Task { await appLock.didBecomeActive() }
-                        // Bij terugkeer naar de voorgrond: dagelijkse backup inhalen.
-                        AutoBackupService().runIfDue(context: container.mainContext, isLaunch: false)
+                        // Bij terugkeer naar de voorgrond: dagelijkse backup inhalen
+                        // (op de achtergrond; loopt er al een, dan geen tweede).
+                        Task { await backupCoordinator.runAutoBackupIfDue(container: container, isLaunch: false) }
                         // Na een import of herstelde backup kunnen er medailles bijkomen.
                         rewards.sync(in: container.mainContext)
                     default:

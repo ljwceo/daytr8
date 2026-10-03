@@ -10,6 +10,10 @@ struct BackupView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var viewModel = BackupViewModel()
+    /// Gedeeld met de app (automatische backup bij start/voorgrond), zodat
+    /// er nooit twee backups naar de map tegelijk lopen.
+    @Environment(BackupCoordinator.self) private var sharedCoordinator: BackupCoordinator?
+    @State private var fallbackCoordinator = BackupCoordinator()
     /// Toont de iOS-documentkiezer via UIKit (i.p.v. `.fileImporter`, dat op
     /// het toestel niet betrouwbaar terugriep).
     @State private var picker = DocumentPickerPresenter()
@@ -18,6 +22,8 @@ struct BackupView: View {
     @State private var inboxSelection: URL?
     /// Wijzigt na een restore, zodat de importmap-sectie opnieuw scant.
     @State private var inboxRefreshID = UUID()
+
+    private var coordinator: BackupCoordinator { sharedCoordinator ?? fallbackCoordinator }
 
     var body: some View {
         List {
@@ -61,12 +67,22 @@ struct BackupView: View {
         .disabled(viewModel.isWorking)
         .overlay {
             if viewModel.isWorking {
-                ProgressView()
-                    .padding(Theme.cardPadding)
-                    .background(RoundedRectangle(cornerRadius: Theme.smallCornerRadius).fill(Theme.elevated))
+                ProgressView {
+                    if let progress = viewModel.progressMessage {
+                        Text(progress)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                .padding(Theme.cardPadding)
+                .background(RoundedRectangle(cornerRadius: Theme.smallCornerRadius).fill(Theme.elevated))
             }
         }
         .onAppear { viewModel.refreshFromSettings() }
+        // Automatische backup klaar (start/voorgrond): status bijwerken.
+        .onChange(of: coordinator.isAutoBackupRunning) { _, isRunning in
+            if !isRunning { viewModel.refreshFromSettings() }
+        }
         .sheet(item: $viewModel.shareFile, onDismiss: {
             viewModel.shareSheetDismissed()
         }) { file in
@@ -81,8 +97,13 @@ struct BackupView: View {
             titleVisibility: .visible
         ) {
             Button("Wis huidige data en herstel", role: .destructive) {
-                viewModel.confirmRestore(into: modelContext)
-                markInboxBackupRestoredIfNeeded()
+                Task {
+                    // Een restore wist alle data: eerst een lopende
+                    // automatische backup laten afronden.
+                    await coordinator.waitForRunningBackup()
+                    viewModel.confirmRestore(into: modelContext)
+                    markInboxBackupRestoredIfNeeded()
+                }
             }
             Button("Annuleren", role: .cancel) {
                 viewModel.cancelRestore()
@@ -124,7 +145,7 @@ struct BackupView: View {
     private var backupSection: some View {
         Section {
             Button {
-                viewModel.createBackup(from: modelContext)
+                Task { await viewModel.createBackup(in: modelContext.container) }
             } label: {
                 Label("Backup maken (.zip)", systemImage: "externaldrive.badge.plus")
             }
@@ -222,9 +243,18 @@ struct BackupView: View {
                 }
 
                 Button {
-                    viewModel.runAutoBackupNow(from: modelContext)
+                    Task { await viewModel.runAutoBackupNow(coordinator: coordinator, container: modelContext.container) }
                 } label: {
                     Label("Nu backuppen naar map", systemImage: "arrow.down.doc")
+                }
+
+                if coordinator.isAutoBackupRunning && !viewModel.isWorking {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Automatische backup bezig…")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
 
                 if let error = viewModel.lastAutoBackupError {
@@ -318,7 +348,9 @@ struct BackupView: View {
     private func pickAutoBackupFolder(action: String) {
         pick(.folder, action: action) { url in
             // Volgende runloop-tik: de kiezer sluit eerst.
-            Task { @MainActor in viewModel.setAutoBackupFolder(url, context: modelContext) }
+            Task { @MainActor in
+                await viewModel.setAutoBackupFolder(url, coordinator: coordinator, container: modelContext.container)
+            }
         }
     }
 
