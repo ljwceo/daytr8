@@ -1381,9 +1381,110 @@ en de toegankelijkheidsinstelling *Verminder beweging*.
 - Op het toestel controleren: vloeiendheid van de hot streak bij 15+ op rij
   op oudere iPhones, en de popover-uitleg (ⓘ) op iPad.
 
+## Aanpasbaar dashboard (deel A) en MT5-bulkimport (deel B)
+
+SPEC.md §13 en §14 zijn toegevoegd en gebouwd. Twee losse commits; elk deel is
+op de branch door de CI gebouwd (unit tests + unsigned IPA).
+
+### Datamodel en migratie
+
+- `Models/AppSchema.swift`: `AppSchema.v1Models` is bevroren (de modellen tot
+  nu toe); `AppSchemaV2` = V1 + `Dashboard`, `DashboardWidget`,
+  `TradeImportMark`. `AppMigrationPlan` heeft een lichtgewicht stap V1 → V2.
+  Geen bestaand model gewijzigd, dus alle data blijft staan; getest met een
+  echte V1-store op schijf (`DashboardPersistenceTests`).
+- `Models/Dashboard.swift`, `Models/DashboardWidget.swift` (type/grootte als
+  ruwe tekst, instellingen als JSON — onbekende types uit een nieuwere versie
+  blijven heel), `Models/DashboardWidgetType.swift` (types + `WidgetSize`),
+  `Models/WidgetSettings.swift` (periode, accounts, kengetal, heatmap-kleur,
+  dimensie, aantal, notitie; tolerant decoderen).
+- `Models/TradeImportMark.swift`: markering "snel toegevoegd" als apart model
+  met alleen het trade-id (zo blijft `Trade` ongewijzigd).
+- Backup (`BackupPayload` + `BackupService`): optionele `dashboards` en
+  `tradeImportMarks`; zonder die velden (oude backup) blijft de huidige
+  dashboardindeling staan. `formatVersion` blijft 3 (optionele velden, net als
+  `settings`). `wipeAll` wist markeringen, maar laat dashboards staan (indeling
+  is net als instellingen geen journaldata).
+
+### Deel A — aanpasbaar dashboard
+
+- `Services/DashboardLayoutService.swift`: standaardindeling (dezelfde kaarten
+  als het oude dashboard + jaar-heatmap), dashboards aanmaken/hernoemen/
+  verplaatsen/verwijderen (laatste blijft), widgets toevoegen/verwijderen/
+  slepen/omhoog-omlaag/grootte/instellingen, "Herstel standaardindeling",
+  rasterindeling (`rows(for:)`).
+- `Services/WidgetDataService.swift`: filters per widget (dashboardfilters +
+  eigen periode/accounts, via `DashboardViewModel`), vorige periode,
+  kengetallen (uit `StatsService`), jaar-heatmap, R-histogram, top/flop (via
+  `ReportAggregationService`); `WidgetComputationCache` hergebruikt
+  berekeningen zolang trades/accounts/regels niet veranderen.
+- `Services/YearHeatmapGrid.swift`: kolom/rij per dag en terug (tik → dag).
+- `ViewModels/DashboardLayoutViewModel.swift`: open tabblad, bewerkmodus, acties.
+- `Views/Dashboard/Widgets/`: `DashboardWidgetDefinition` (protocol +
+  `DashboardWidgetRegistry` + `WidgetRenderContext`), container, bibliotheek,
+  instellingen-sheet (`StandardWidgetSettingsSections`) en de widgets:
+  jaar-heatmap (`Canvas`, kleur = netto P&L / trades / win rate / R, tik =
+  `DayDetailView`), statistiekkaart, equity curve, dagelijkse P&L, drawdown,
+  mini-kalender, top/flop, R-histogram, doelen, regels-streak, recente
+  trades, trading score, notitie, backup-status.
+- `Views/Dashboard/DashboardView.swift`: vervangen door het widgetraster (live
+  koers, backup- en limietwaarschuwing en filterbalk blijven bovenaan);
+  `DashboardTabsBar.swift` voor de tabbladen. Filters gelden per dashboard; de
+  bewaarde filters van het oude dashboard gaan mee naar "Overzicht".
+- `GoalsCardView`: inhoud uitgesplitst in `GoalsListView` (hergebruikt door
+  de doelwidget, zelfde weergave). `SeedService`: standaardindeling bij de start.
+- `Theme`: `scaleColor` (kleurschaal uit profit/loss/neutral/accent, dus elk
+  thema en eigen thema's) en maten voor widgets/heatmap; geen nieuwe paletkleuren.
+
+### Deel B — MT5-bulkimport
+
+- `Services/MT5HistoryParser.swift`: puur, invoer = Vision-blokken met
+  positie (of regels). Herkent per blok kop (symbool + buy/sell + volume),
+  prijzen (`→`/`->`, zonder pijl = onzeker), sluittijd en bedragen; koppelt
+  op hoogte aan de juiste trade. Spatie/NBSP/smalle spatie als
+  duizendtalscheiding, `−`/`–` als min, komma-decimaal niet gegokt, OCR-
+  correctie (O → 0, l → 1) en lage Vision-zekerheid worden gemarkeerd.
+  Afgekapte trades (boven/onder) komen mee als onvolledig.
+- `Services/MT5ScreenshotImportService.swift`: samenvoegen over screenshots
+  (zelfde trade of afgekapt stuk van een volledige trade), duplicaten
+  (symbool + sluittijd + prijzen) binnen de import en tegen het journal,
+  controles (ontbrekend = fout; onzeker, P&L vs prijsverschil × volume ×
+  contract — preset/instrument, forex 100k, XAU 100, XAG 5000, marge voor
+  valuta — en onderling per symbool, onbekend symbool, datum in de toekomst
+  = waarschuwing), opslaan (entry- = sluittijd, P&L als `manualNetPnL`,
+  screenshot als bijlage, `TradeImportMark`), samenvatting.
+- `ViewModels/MT5ImportViewModel.swift`, `Views/Trades/MT5ImportView.swift`
+  (kiezen → lezen → controlescherm met regel-editor → samenvatting).
+  Standaard aangevinkt: alleen regels zonder meldingen (onbekend symbool
+  mag); fouten kunnen niet aangevinkt worden.
+- Ingang: knop in het trade log (naast +) en Meer → Data. Trade log: filter en
+  badge "Snel toegevoegd"; tradedetail: "Aanvullen" en "Markering weghalen".
+  `TradeEditingService.delete` ruimt de markering op.
+- `RecognizedTextBox.confidence` (Vision-zekerheid, standaard 1).
+
+### Tests
+
+- `DashboardLayoutServiceTests`, `WidgetDataServiceTests` (incl. heatmap met
+  ~5 jaar data, raster), `DashboardPersistenceTests` (backup, oude backup,
+  migratie V1 → V2), `MT5HistoryParserTests` (duizendtallen met spatie/NBSP,
+  negatief, XAUUSD, forex 5 decimalen, afgekapt boven/onder, door elkaar
+  lopend, samengevoegde blokken, samenvattings- en stortingsregels, onzeker,
+  komma-decimaal), `MT5ScreenshotImportServiceTests` (samenvoegen,
+  duplicaten, controles, opslaan, markering, filter, backup, viewmodel).
+
+### Openstaand / met de hand testen
+
+- De MT5-parser is getest op uitgeschreven en gepositioneerde fixtures, niet
+  op ruwe Vision-uitvoer van de meegestuurde screenshot: controleer op het
+  toestel of een echte History-screenshot (donkere modus) volledig herkend
+  wordt; zo niet, de herkende tekst staat in de regel-editor ("Herkende tekst").
+- Sluittijden worden gelezen in de tijdzone van het toestel (zoals de losse
+  screenshot-import); MT5 toont servertijd — controleer of dat klopt.
+- Drag & drop van widgets op iPhone (lang indrukken in de bewerkmodus) en de
+  heatmap (horizontaal scrollen, tikken op een stip) op het toestel testen.
+
 ## Volgende fase
 
-SPEC.md §1–§12 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
-screenshot-templates na. De unit tests zijn groen en blokkeren de IPA-build
-weer. Voorstel voor de volgende stap: een template-editor voor eigen
-screenshot-templates.
+SPEC.md §1–§14 zijn geïmplementeerd, op het aanmaken/bewerken van eigen
+screenshot-templates na. Voorstel: de MT5-import tegen echte screenshots
+bijstellen na de eerste test op het toestel, daarna een template-editor.

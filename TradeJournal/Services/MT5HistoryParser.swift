@@ -168,7 +168,7 @@ public struct MT5HistoryParser: Sendable {
         guard !usable.isEmpty else { return [] }
 
         var fragments = Fragments()
-        for box in usable { classify(box, into: &fragments) }
+        for box in Self.mergingSplitHeaders(usable) { classify(box, into: &fragments) }
 
         let unit = Self.median(usable.map { $0.boundingBox.height }) ?? 0.02
         let headers = fragments.headers.sorted { $0.geometry.midY > $1.geometry.midY }
@@ -335,6 +335,38 @@ public struct MT5HistoryParser: Sendable {
         if !rest.isEmpty, let amount = Self.parseAmount(rest) {
             fragments.amounts.append(AmountFragment(geometry: geometry, value: amount.value, uncertain: amount.corrected))
         }
+    }
+
+    /// Vision levert het (vette) symbool en het (gekleurde) "sell 0.50" soms
+    /// als twee blokken. Buren op dezelfde regel die samen pas een kopregel
+    /// vormen, worden hier tot één blok samengevoegd (laagste zekerheid telt).
+    static func mergingSplitHeaders(_ boxes: [RecognizedTextBox]) -> [RecognizedTextBox] {
+        var result: [RecognizedTextBox] = []
+        for row in ScreenshotLineBuilder.rows(from: boxes) {
+            var index = 0
+            while index < row.count {
+                let current = row[index]
+                if firstMatch(headerPattern, in: unifySpaces(current.text)) == nil {
+                    var merged: RecognizedTextBox?
+                    for length in 2...3 where index + length <= row.count {
+                        let parts = Array(row[index..<(index + length)])
+                        let text = parts.map(\.text).joined(separator: " ")
+                        guard firstMatch(headerPattern, in: unifySpaces(text)) != nil else { continue }
+                        let rect = parts.dropFirst().reduce(parts[0].boundingBox) { $0.union($1.boundingBox) }
+                        merged = RecognizedTextBox(text: text, boundingBox: rect, confidence: parts.map(\.confidence).min() ?? 1)
+                        index += length
+                        break
+                    }
+                    if let merged {
+                        result.append(merged)
+                        continue
+                    }
+                }
+                result.append(current)
+                index += 1
+            }
+        }
+        return result
     }
 
     // MARK: - Getallen (statisch en los testbaar)

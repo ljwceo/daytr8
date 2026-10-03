@@ -147,6 +147,23 @@ final class MT5HistoryParserTests: XCTestCase {
         XCTAssertTrue(trades.allSatisfy(\.isComplete))
     }
 
+    func test_symbolAndSideAsSeparateBoxes_areJoined() {
+        let boxes = [
+            box("AUDCAD", x: 0.04, y: 0.80, width: 0.16),
+            box("sell 0.50", x: 0.22, y: 0.80, width: 0.16),
+            box("-12.35", x: 0.72, y: 0.80, width: 0.24),
+            box("0.89123 \u{2192} 0.89150", x: 0.04, y: 0.766, width: 0.42),
+            box("2026.04.24 17:58:32", x: 0.58, y: 0.766, width: 0.38)
+        ]
+        let trades = parser.parse(boxes)
+        XCTAssertEqual(trades.count, 1)
+        XCTAssertEqual(trades[0].symbol, "AUDCAD")
+        XCTAssertEqual(trades[0].direction, .short)
+        XCTAssertEqual(trades[0].volume, 0.5)
+        XCTAssertEqual(trades[0].pnl, -12.35)
+        XCTAssertTrue(trades[0].isComplete)
+    }
+
     func test_linesWithoutPositions_realScreenshotFixture() {
         let lines = """
         NAS100 buy 10  -109.35
